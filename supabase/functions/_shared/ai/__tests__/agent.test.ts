@@ -1,4 +1,6 @@
-import { test } from 'node:test';
+import { beforeEach, test } from 'node:test';
+import { _resetCooldowns } from '../agent/models.ts';
+beforeEach(() => _resetCooldowns());
 import assert from 'node:assert/strict';
 import { cleanPageContext, cleanSurface, requestCancel, runTurn, trimHistory, usageRows, type CoreDeps } from '../agent/core.ts';
 import { checkProfile, safeEqual } from '../agent/server.ts';
@@ -8,7 +10,7 @@ import { AUTHORITY_POLICY, BUDDY_PERSONA, buildInstructions, effectivePersona, i
 import { agentConfig } from '../agent/config.ts';
 import { costUsd, DEFAULT_PRICES, pricesFrom, UsageMeter } from '../prices.ts';
 import { ALL_TOOL_DEFS, brandWeekArgs } from '../agent/tools.ts';
-import { LlmError, pickModel, requestBody, resultOf, type LlmRequest, type LlmResult } from '../llm/openai.ts';
+import { LlmError, isFreeOpenAiModel, requestBody, resultOf, type LlmRequest, type LlmResult } from '../llm/openai.ts';
 
 // ── a fake supabase-js client: tables in memory, filters ignored except eq on id/user_id ──
 function fakeDb(tables: Record<string, any[]> = {}, opts: { rpc?: (fn: string, args: any) => any; updateDelayMs?: number } = {}) {
@@ -102,10 +104,10 @@ function scriptedLlm(script: Array<Partial<LlmResult> & { stream?: string[] }>) 
 }
 
 function deps(db: any, llm: CoreDeps['llm'], calls: any[] = []): CoreDeps {
-  return { admin: db, searchRpc: searchRpc(calls), asUser: BOSS, apiKey: 'k', embed: async () => [0.1], llm, now: () => NOW, requestId: 'req-1' };
+  return { admin: db, searchRpc: searchRpc(calls), asUser: BOSS, geminiKey: 'k', embed: async () => [0.1], llm, now: () => NOW, requestId: 'req-1' };
 }
 const baseTables = () => ({
-  ai_assistant_config: [{ id: 1, persona: 'You are the WurxOS Assistant, a friendly internal support bot…', model: 'gpt-5.4-mini', enabled: true, retrieval: {} }],
+  ai_assistant_config: [{ id: 1, persona: 'You are the WurxOS Assistant, a friendly internal support bot…', model: 'gemini-3.5-flash-lite', model_key_slot: 'gemini', enabled: true, retrieval: {} }],
   ai_request_log: [], ai_conversations: [], ai_messages: [],
   brands: [{ id: 'br1', brand_name: 'Bentgo', status: 'active', owner_id: null }],
 });
@@ -378,9 +380,9 @@ test('numbers without [D#] are flagged; dates, weeks and cited figures are not',
 // ── adapter + config ────────────────────────────────────────────────────────
 
 test('Responses adapter: allow-listed models, function tools, reasoning, stateless with encrypted reasoning', () => {
-  assert.equal(pickModel('gpt-5.5'), 'gpt-5.5');
-  assert.equal(pickModel('openai/gpt-4o-mini'), 'gpt-5.4-mini');
-  const b = requestBody({ apiKey: 'k', model: 'gpt-5.4-mini', instructions: 'i', input: [], tools: ALL_TOOL_DEFS.slice(0, 1), effort: 'low', maxOutputTokens: 100, onDelta: () => {} }) as any;
+  assert.equal(isFreeOpenAiModel('gpt-6-luna'), true);
+  assert.equal(isFreeOpenAiModel('gpt-5.5'), false);
+  const b = requestBody({ apiKey: 'k', model: 'gpt-6-luna', instructions: 'i', input: [], tools: ALL_TOOL_DEFS.slice(0, 1), effort: 'low', maxOutputTokens: 100, onDelta: () => {} }) as any;
   assert.deepEqual([b.tools[0].type, b.reasoning.effort, b.max_output_tokens, b.store, b.stream, b.include[0]], ['function', 'low', 100, false, true, 'reasoning.encrypted_content']);
   const r = resultOf({
     status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' },
@@ -616,10 +618,10 @@ test('a turn logs its surface and its rerank/embedding spend; slack surface kept
   assert.deepEqual(u.map((x: any) => [x.kind, x.tokens_in, x.user_id, x.request_id]), [['embed_query', 9, BOSS, 'req-1']]);
   // the chat cost uses the stored price table when the config row has one
   const t = baseTables();
-  (t.ai_assistant_config[0] as any).prices = { 'gpt-5.4-mini': { in: 10, cached: 10, out: 0 } };
+  (t.ai_assistant_config[0] as any).prices = { 'gemini-3.5-flash-lite': { in: 10, cached: 10, out: 0 } };
   const db2 = fakeDb(t);
   await runTurn({ userId: BOSS, role: 'boss', message: 'q' }, deps(db2, scriptedLlm([{ stream: ['ok'], usage: { input: 1000, cached: 0, output: 0, reasoning: 0 } }]).llm), () => {});
-  assert.equal(db2.inserts.ai_request_log[0].est_cost_usd, 0.01);
+  assert.equal(db2.inserts.ai_request_log[0].est_cost_usd, 0);   // free models never cost, whatever the price table says
   assert.equal(db2.inserts.ai_request_log[0].surface, 'full');
 });
 // ── regenerate in place, started-first, server_now (mig 389) ───────────────
@@ -694,40 +696,27 @@ test('regenerate refusals: not yours, not the last reply, still generating, alre
   assert.equal(ok.answer, 'x');
 });
 
-// ── gpt-5.4-nano (mig 395) ─────────────────────────────────────────────────
+// ── free models only (Owner 2026-11-02) ────────────────────────────────────
 
-test('models: nano is allowed, mini stays the default, unknown falls back to mini', () => {
-  assert.equal(pickModel('gpt-5.4-nano'), 'gpt-5.4-nano');
-  assert.equal(pickModel('gpt-5.4-nano-2026-03-17'), 'gpt-5.4-mini');   // pinned snapshot ids are not on the list
-  assert.equal(pickModel(undefined), 'gpt-5.4-mini');
-  assert.equal(pickModel('gpt-4o'), 'gpt-5.4-mini');
+test('only the listed free OpenAI model may be called; a paid one is refused before any request', async () => {
+  const calls: string[] = [];
+  const fetchImpl = (async (u: any) => { calls.push(String(u)); return new Response('{}'); }) as any;
+  const { respond } = await import('../llm/openai.ts');
+  for (const model of ['gpt-5.4-nano', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-4o']) {
+    await assert.rejects(respond({ apiKey: 'k', model, instructions: 'i', input: [], fetchImpl }), /not a free OpenAI model/);
+  }
+  assert.deepEqual(calls, []);
 });
 
-test('nano: an effort it rejects (minimal) is sent as low; other models unchanged', () => {
-  const body = (model: string, effort: any) => (requestBody({ apiKey: 'k', model, instructions: 'i', input: [], effort }) as any).reasoning.effort;
-  assert.equal(body('gpt-5.4-nano', 'minimal'), 'low');
-  assert.equal(body('gpt-5.4-nano', 'none'), 'none');
-  assert.equal(body('gpt-5.4-nano', 'medium'), 'medium');
-  assert.equal(body('gpt-5.4-mini', 'minimal'), 'minimal');
-});
-
-test('nano pricing: default table has it (assumed), and costs follow it', () => {
-  const p = pricesFrom({});
-  assert.deepEqual(p['gpt-5.4-nano'], { in: 0.2, cached: 0.02, out: 1.25 });
-  // 10k in (2k cached) + 1k out
-  assert.equal(costUsd(p, 'gpt-5.4-nano', { input: 10_000, cached: 2000, output: 1000 }).usd, (8000 * 0.2 + 2000 * 0.02 + 1000 * 1.25) / 1e6);
-  // a stored override wins
-  assert.equal(pricesFrom({ 'gpt-5.4-nano': { in: 0.1, cached: 0.01, out: 0.4 } })['gpt-5.4-nano'].out, 0.4);
-});
-
-test('a turn uses the model override (serve-assistant --model), still allow-listed', async () => {
+test('a turn uses the model override (serve-assistant --model/--key-slot)', async () => {
   const db = fakeDb(baseTables());
   const { llm, seen } = scriptedLlm([{ stream: ['ok'] }]);
-  await runTurn({ userId: BOSS, role: 'boss', message: 'q' }, { ...deps(db, llm), model: 'gpt-5.4-nano' }, () => {});
-  assert.equal(seen[0].model, 'gpt-5.4-nano');
-  assert.equal(db.inserts.ai_request_log[0].model, 'gpt-5.4-nano');
+  await runTurn({ userId: BOSS, role: 'boss', message: 'q' }, { ...deps(db, llm), model: 'gemini-3.6-flash', modelKeySlot: 'gemini' }, () => {});
+  assert.equal(seen[0].model, 'gemini-3.6-flash');
+  assert.equal(db.inserts.ai_request_log[0].model, 'gemini-3.6-flash');
+  // a paid OpenAI model on the free-tier key is not taken, even as an override
   const db2 = fakeDb(baseTables());
   const s2 = scriptedLlm([{ stream: ['ok'] }]);
-  await runTurn({ userId: BOSS, role: 'boss', message: 'q' }, { ...deps(db2, s2.llm), model: 'not-a-model' }, () => {});
-  assert.equal(s2.seen[0].model, 'gpt-5.4-mini');
+  await runTurn({ userId: BOSS, role: 'boss', message: 'q' }, { ...deps(db2, s2.llm), fallbackKey: 'k', model: 'gpt-5.4-nano', modelKeySlot: 'fallback' }, () => {});
+  assert.equal(s2.seen[0].model, 'gemini-3.5-flash-lite');
 });

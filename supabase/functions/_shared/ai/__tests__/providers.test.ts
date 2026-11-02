@@ -12,11 +12,12 @@ import { compactInstructions } from '../agent/prompt.ts';
 import { checkProfile } from '../agent/server.ts';
 import { providerAccountIssue, providerIssueMessage } from '../providerErrors.ts';
 
-beforeEach(() => { _resetCooldowns(); _resetBudgets(); });
+// CAT's rows are shared between tests: a cooldown a turn wrote on one (catalog params.cooling) must not leak into the next.
+beforeEach(() => { _resetCooldowns(); _resetBudgets(); for (const c of CAT) if (c.params) delete (c.params as any).cooling; });
 
 const row = (slot: any, model: string, o: Partial<CatalogRow> = {}): CatalogRow =>
-  ({ key_slot: slot, model, available: true, supports_tools: true, supports_stream: true, free: slot === 'groq' || slot === 'gemini', params: {}, ...o });
-const KEYS = { primary: 'pk', fallback: 'fk', groq: 'qk', gemini: 'gk' };
+  ({ key_slot: slot, model, available: true, supports_tools: true, supports_stream: true, free: true, params: {}, ...o });
+const KEYS = { fallback: 'fk', groq: 'qk', gemini: 'gk' };
 const CHAIN = [{ key_slot: 'gemini', model: 'gemini-3.5-flash' }, { key_slot: 'groq', model: 'openai/gpt-oss-120b' }, { key_slot: 'groq', model: 'qwen/qwen3.8-27b' }, { key_slot: 'fallback', model: 'gpt-6-luna' }];
 const sseOf = (chunks: unknown[]) => new Response(chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } });
 
@@ -129,14 +130,14 @@ test('the chain across providers, then the safety net in its order; keys missing
   const cat = [row('gemini', 'gemini-3.5-flash'), row('gemini', 'gemini-3.7-flash'), row('gemini', 'gemini-3.1-flash-lite'), row('gemini', 'gemma-4-26b-a4b-it'),
     row('gemini', 'gemini-3-flash-preview'), row('gemini', 'gemini-3.8-flash', { supports_stream: false }), row('groq', 'openai/gpt-oss-120b'), row('groq', 'openai/gpt-oss-20b'),
     row('groq', 'qwen/qwen3.8-27b'), row('fallback', 'gpt-6-luna'), row('groq', 'moonshotai/kimi-k2')];
-  const cfg = { model: 'gpt-6-luna', model_key_slot: 'fallback', fallback_enabled: true, fallback_models: CHAIN };
+  const cfg = { model: 'gemini-3.5-flash', model_key_slot: 'gemini', fallback_enabled: true, fallback_models: CHAIN };
   const chain = chooseTargets(cfg, cat, KEYS);
-  assert.deepEqual(chain.map((t) => `${t.keySlot}:${t.model}`), ['fallback:gpt-6-luna', 'gemini:gemini-3.5-flash', 'groq:openai/gpt-oss-120b', 'groq:qwen/qwen3.8-27b']);
+  assert.deepEqual(chain.map((t) => `${t.keySlot}:${t.model}`), ['gemini:gemini-3.5-flash', 'groq:openai/gpt-oss-120b', 'groq:qwen/qwen3.8-27b', 'fallback:gpt-6-luna']);
   assert.deepEqual(safetyNet(cat, KEYS, chain).map((t) => `${t.keySlot}:${t.model}`),
-    ['gemini:gemini-3-flash-preview', 'gemini:gemini-3.7-flash', 'gemini:gemini-3.1-flash-lite', 'gemini:gemma-4-26b-a4b-it', 'groq:openai/gpt-oss-20b', 'groq:moonshotai/kimi-k2']);
+    ['gemini:gemini-3-flash-preview', 'gemini:gemini-3.1-flash-lite', 'gemini:gemini-3.7-flash', 'gemini:gemma-4-26b-a4b-it', 'groq:openai/gpt-oss-20b', 'groq:moonshotai/kimi-k2']);
   assert.ok(netRank({ keySlot: 'gemini', model: 'gemini-3.5-flash' }) < netRank({ keySlot: 'groq', model: 'openai/gpt-oss-120b' }));
   // no Groq key: its entries leave the chain and the net
-  const noGroq = { primary: 'pk', fallback: 'fk', gemini: 'gk' };
+  const noGroq = { fallback: 'fk', gemini: 'gk' };
   assert.ok(!chooseTargets(cfg, cat, noGroq).some((t) => t.keySlot === 'groq'));
   assert.ok(!safetyNet(cat, noGroq, []).some((t) => t.keySlot === 'groq'));
   // a local override on a free key is taken as given
@@ -154,9 +155,12 @@ test('cooldown: quota / limit / refused keys keep a model out for a while; a too
   assert.equal(coolingDown(t, 1), null);
   coolDown(t, Object.assign(new LlmError('model HTTP 429: rate limit', 429), { retryAfterMs: 45_000 }), 0);
   assert.deepEqual([coolingDown(t, 44_000)?.issue, coolingDown(t, 46_000)], ['busy', null]);
-  const p = { keySlot: 'primary' as const, model: 'gpt-5.4-mini' };
+  const p = { keySlot: 'fallback' as const, model: 'gpt-6-luna' };
   coolDown(p, new LlmError('model HTTP 429: {"error":{"code":"insufficient_quota"}}', 429), 0);
   assert.deepEqual([coolingDown(p, 9 * 60_000)?.issue, coolingDown(p, 11 * 60_000)], ['quota', null]);
+  // a refused key (401) takes out the whole slot, every model on it
+  coolDown({ keySlot: 'gemini', model: 'gemini-3.6-flash' }, new LlmError('model HTTP 401: API key not valid', 401), 0);
+  assert.deepEqual([coolingDown({ keySlot: 'gemini', model: 'gemini-3.5-flash-lite' }, 60_000)?.issue, coolingDown({ keySlot: 'groq', model: 'x' }, 60_000)], ['auth', null]);
 });
 
 // ── a whole turn ────────────────────────────────────────────────────────────
@@ -164,7 +168,7 @@ test('cooldown: quota / limit / refused keys keep a model out for a while; a too
 function db(cfg: Record<string, unknown> = {}) {
   const inserts: Record<string, any[]> = {};
   let seq = 0;
-  const base: Record<string, any[]> = { ai_assistant_config: [{ id: 1, persona: '', model: 'gpt-5.4-mini', model_key_slot: 'primary', enabled: true, retrieval: {}, prices: {},
+  const base: Record<string, any[]> = { ai_assistant_config: [{ id: 1, persona: '', model: 'gemini-3.5-flash', model_key_slot: 'gemini', enabled: true, retrieval: {}, prices: {},
     fallback_enabled: true, fallback_models: CHAIN, auto_failover: true, ...cfg }] };
   const from = (table: string) => {
     let op = 'select'; let payload: any = null; const where: any = {};
@@ -185,7 +189,7 @@ function db(cfg: Record<string, unknown> = {}) {
   return { from, rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'missing' } }), inserts };
 }
 const CAT = [row('gemini', 'gemini-3.5-flash'), row('gemini', 'gemini-3.7-flash'), row('groq', 'openai/gpt-oss-120b'), row('groq', 'qwen/qwen3.8-27b'), row('fallback', 'gpt-6-luna')];
-const deps = (d: any, fetchImpl: any, o: any = {}) => ({ admin: d, searchRpc: async () => [], asUser: 'u1', apiKey: 'pk', fallbackKey: 'fk', groqKey: 'qk', geminiKey: 'gk',
+const deps = (d: any, fetchImpl: any, o: any = {}) => ({ admin: d, searchRpc: async () => [], asUser: 'u1', fallbackKey: 'fk', groqKey: 'qk', geminiKey: 'gk',
   embed: async () => [0.1], catalog: CAT, requestId: 'r1', ...o,
   llm: (r: LlmRequest) => (o.responses ?? (async () => { throw new LlmError('model HTTP 429: {"error":{"code":"insufficient_quota","message":"You exceeded your current quota"}}', 429); }))(r),
   chatLlm: (r: LlmRequest) => chatRespond({ ...r, fetchImpl }) });
@@ -214,32 +218,53 @@ test('a full turn on Gemini: tool call, the tool result goes back as a tool mess
   assert.deepEqual([reply.meta.model, reply.meta.key_slot], ['gemini-3.5-flash', 'gemini']);
 });
 
-test('primary out of credit → the chain lands on Gemini in the same turn; a busy Gemini hands over to Groq; the next turn skips what is cooling', async () => {
-  let geminiBusy = false;
+test('Gemini out of quota → the same turn lands on Groq; the NEXT turn skips Gemini without a request (also on another worker, via the catalog); a busy Groq hands over to the OpenAI free tier', async () => {
+  let geminiQuota = true;
+  let groqBusy = false;
   const seen: string[] = [];
   const fetchImpl = async (url: string, init: any) => {
     const b = JSON.parse(init.body);
     seen.push(`${init.headers.authorization.slice(7)}:${b.model}`);
-    if (url.includes('googleapis') && geminiBusy) return new Response(JSON.stringify([{ error: { code: 503, message: 'The model is overloaded.', status: 'UNAVAILABLE' } }]), { status: 503 });
+    if (url.includes('googleapis') && geminiQuota) return new Response(JSON.stringify([{ error: { code: 429, message: 'You exceeded your current quota, please check your plan and billing details.', status: 'RESOURCE_EXHAUSTED' } }]), { status: 429 });
+    if (url.includes('groq') && groqBusy) return new Response(JSON.stringify({ error: { message: 'overloaded', code: 'server_error' } }), { status: 503 });
     return sseOf([{ choices: [{ delta: { content: `answer from ${b.model}` }, finish_reason: 'stop' }] }]);
   };
+  const cat = CAT.map((c) => ({ ...c, params: {} }));      // one catalog, shared between the turns like the table is
   const d = db();
   const ev: any[] = [];
-  const r1 = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, fetchImpl), (e) => ev.push(e));
-  assert.equal(r1.answer, 'answer from gemini-3.5-flash');
+  const r1 = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, fetchImpl, { catalog: cat }), (e) => ev.push(e));
+  assert.equal(r1.answer, 'answer from openai/gpt-oss-120b');
+  assert.deepEqual(seen, ['gk:gemini-3.5-flash', 'qk:openai/gpt-oss-120b']);
   assert.deepEqual(ev.filter((e) => e.status && !e.done).map((e) => e.status), ['On it…', 'Switching to a backup model…']);
   const log1 = d.inserts.ai_request_log[0];
   assert.deepEqual([log1.key_slot, log1.flags.fallback_used, log1.flags.model_attempts.map((a: any) => a.target)],
-    ['gemini', { from: 'primary:gpt-5.4-mini', to: 'gemini:gemini-3.5-flash', reason: 'quota' }, ['primary:gpt-5.4-mini', 'gemini:gemini-3.5-flash']]);
-  // turn 2: the primary is cooling (not called); Gemini 503 → one retry → Groq answers
-  geminiBusy = true;
+    ['groq', { from: 'gemini:gemini-3.5-flash', to: 'groq:openai/gpt-oss-120b', reason: 'quota' }, ['gemini:gemini-3.5-flash', 'groq:openai/gpt-oss-120b']]);
+  // turn 2, same worker: Gemini is cooling, so it is not called at all
   seen.length = 0;
   const d2 = db();
-  const r2 = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d2, fetchImpl), () => {});
+  const r2 = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d2, fetchImpl, { catalog: cat }), () => {});
   assert.equal(r2.answer, 'answer from openai/gpt-oss-120b');
-  assert.deepEqual(seen, ['gk:gemini-3.5-flash', 'gk:gemini-3.5-flash', 'qk:openai/gpt-oss-120b']);
-  const log2 = d2.inserts.ai_request_log[0];
-  assert.deepEqual([log2.flags.skipped_cooling, log2.flags.fallback_used.to, log2.flags.fallback_used.reason], [['primary:gpt-5.4-mini'], 'groq:openai/gpt-oss-120b', 'server_error']);
+  assert.deepEqual(seen, ['qk:openai/gpt-oss-120b']);
+  assert.deepEqual(d2.inserts.ai_request_log[0].flags.skipped_cooling, ['gemini:gemini-3.5-flash']);
+  // turn 3, a fresh worker (empty memory): the cooldown comes back from the catalog row
+  _resetCooldowns();
+  seen.length = 0;
+  const r3 = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(db(), fetchImpl, { catalog: cat }), () => {});
+  assert.equal(r3.answer, 'answer from openai/gpt-oss-120b');
+  assert.deepEqual(seen, ['qk:openai/gpt-oss-120b']);
+  // once Gemini's cooldown is over it is tried again
+  _resetCooldowns();
+  for (const c of cat) if ((c.params as any)?.cooling) (c.params as any).cooling.until = Date.now() - 1;
+  geminiQuota = false; seen.length = 0;
+  const r4 = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(db(), fetchImpl, { catalog: cat }), () => {});
+  assert.equal(r4.answer, 'answer from gemini-3.5-flash');
+  assert.deepEqual(seen, ['gk:gemini-3.5-flash']);
+  // Gemini 503 → one retry → Groq 503 too (one retry) → the OpenAI free-tier model (here refused with no quota by the stub)
+  _resetCooldowns();
+  geminiQuota = true; groqBusy = true; seen.length = 0;
+  const cat2 = CAT.map((c) => ({ ...c, params: {} }));
+  const r5 = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(db(), fetchImpl, { catalog: cat2, responses: async (r: LlmRequest) => (r.onDelta?.('answer from luna'), { text: 'answer from luna', toolCalls: [], output: [], usage: { input: 1, cached: 0, output: 1, reasoning: 0 }, status: 'completed' }) }), () => {});
+  assert.equal(r5.answer, 'answer from luna');
 });
 
 test('nothing works: at most MAX_MODEL_ATTEMPTS calls, then one specific message; auto_failover off → the chain only', async () => {
@@ -250,17 +275,18 @@ test('nothing works: at most MAX_MODEL_ATTEMPTS calls, then one specific message
   const d = db();
   await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, fetchImpl, { catalog: cat }), (e) => ev.push(e));
   const log = d.inserts.ai_request_log[0];
-  assert.equal(log.flags.model_attempts.length, 8);          // 2 OpenAI (primary, luna) + 6 free
-  assert.equal(calls, 6);
+  assert.equal(log.flags.model_attempts.length, 8);          // the chain (4, one of them the OpenAI free tier) + 4 of the safety net
+  assert.equal(calls, 7);                                     // every attempt but the OpenAI one goes over fetch
   const msg = ev.find((e) => e.error).error;
-  assert.match(msg, /OpenAI credits are used up/);
   assert.match(msg, /Gemini has no free quota left on its key/);
   assert.match(msg, /Groq has no free quota left on its key/);
+  assert.match(msg, /OpenAI \(free tier\) has no free quota left/);
+  assert.doesNotMatch(msg, /credits|billing|top up/i);
   _resetCooldowns();
   calls = 0;
   const d2 = db({ auto_failover: false, fallback_models: [{ key_slot: 'gemini', model: 'gemini-3.5-flash' }] });
   await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d2, fetchImpl, { catalog: cat }), () => {});
-  assert.equal(d2.inserts.ai_request_log[0].flags.model_attempts.length, 2);
+  assert.equal(d2.inserts.ai_request_log[0].flags.model_attempts.length, 1);   // the chain is just Gemini 3.5 flash (the duplicate is dropped)
 });
 
 test('text already streamed is never handed to another model', async () => {

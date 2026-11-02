@@ -15,7 +15,8 @@
 //           otherwise    → JSON { conversationId, requestId, reply, sources }
 //
 // Allowed roles: boss and developer always, plus ai_assistant_config.allowed_roles.
-// Env (function secrets): OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK, GROQ_API_KEY, GEMINI_API_KEY, NVIDIA_API_KEY, NVIDIA_API_KEY_2 (optional), TAVILY_API_KEY + BRAVE_API_KEY (optional, web search), AI_INTERNAL_SECRET,
+// Env (function secrets): GEMINI_API_KEY, GROQ_API_KEY, OPEN_AI_API_KEY_FALLBACK (OpenAI FREE tier), NVIDIA_API_KEY (last resort),
+//   OPEN_AI_API_KEY (EMBEDDINGS only; no chat model uses it), NVIDIA_API_KEY_2 (optional), TAVILY_API_KEY + BRAVE_API_KEY (optional, web search), AI_INTERNAL_SECRET,
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY (automatic).
 // Deploy: NOT YET — only with the Owner's go (TEAM.md rule 0/3), --project-ref dev.
 // ============================================================
@@ -47,7 +48,7 @@ const AI_INTERNAL_SECRET = Deno.env.get('AI_INTERNAL_SECRET') ?? '';
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
-  if (!env.openAiKey) return json({ error: 'the assistant is not configured (no model key)' }, 500);
+  if (![env.geminiKey, env.groqKey, env.openAiKeyFallback, env.nvidiaKey, env.nvidia2Key].some(Boolean)) return json({ error: 'the assistant is not configured (no model key)' }, 500);
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
   const admin = createClient(env.url, env.serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });

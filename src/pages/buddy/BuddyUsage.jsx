@@ -43,7 +43,7 @@ export default function BuddyUsage({ readOnly }) {
         <i className="bi bi-graph-up" aria-hidden="true" />
         <div>
           <h3 id="bd-usage-title" className="bd-card-title">Usage and cost</h3>
-          <div className="bd-card-sub">Estimated OpenAI spend for Buddy, in USD. Dates are Pakistan time.</div>
+          <div className="bd-card-sub">Estimated spend for Buddy, in USD. Buddy answers with free models only, so chat costs $0. Dates are Pakistan time.</div>
         </div>
       </div>
 

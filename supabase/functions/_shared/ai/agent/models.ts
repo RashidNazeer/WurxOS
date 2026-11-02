@@ -1,9 +1,16 @@
-// Which model answers, on which key, and what to fall back to
-// (Owner, 2026-10-01: the Boss can pick ANY model; free models are fallbacks;
-// Buddy must never go down).
+// Which model answers, on which key, and what to fall back to.
+// Owner, 2026-11-02: Buddy uses FREE models only. There is no paid OpenAI key
+// any more (the old 'primary' slot is gone); Buddy must never go down, so the
+// chain spans several providers.
 //
-//   slots     primary / fallback = the two OpenAI keys (Responses API);
-//             groq / gemini = free keys on OpenAI-compatible Chat Completions.
+//   slots     gemini / groq = free keys on OpenAI-compatible Chat Completions;
+//             fallback = the OpenAI FREE-TIER key (Responses API), restricted
+//             to the models the catalog marks free (llm/openai.ts FREE_OPENAI_MODELS);
+//             nvidia / nvidia2 = NVIDIA API-catalog keys, for prototyping /
+//             testing only per NVIDIA's terms: LAST-RESORT fallbacks, never the
+//             configured model, and never given people / pay data.
+//   legacy    a stored config that still names the old 'primary' slot does not
+//             crash: that entry is dropped and the turn runs on the free chain.
 //   catalog   ai_model_catalog (mig 397, 401): EVERY model each key lists, with
 //             what it can do, or why it cannot be used (`reason`); filled by
 //             refreshModels() (the {refresh_models} action).
@@ -15,63 +22,79 @@
 //   params    request fields a model rejected (400 unsupported ...) are dropped
 //             for that model and remembered.
 
-import { ALLOWED_MODELS, DEFAULT_MODEL, LlmError } from '../llm/openai.ts';
+import { FREE_OPENAI_MODELS, LlmError } from '../llm/openai.ts';
 import { providerAccountIssue, retryAfterMs, type ProviderIssue } from '../providerErrors.ts';
 import type { Prices } from '../prices.ts';
 
-export type KeySlot = 'primary' | 'fallback' | 'groq' | 'gemini' | 'nvidia' | 'nvidia2';
+export type KeySlot = 'fallback' | 'groq' | 'gemini' | 'nvidia' | 'nvidia2';
 export type Api = 'openai-responses' | 'openai-chat';
-export const SLOTS: Record<KeySlot, { api: Api; base: string; label: string; free: boolean }> = {
-  primary: { api: 'openai-responses', base: 'https://api.openai.com/v1', label: 'OpenAI', free: false },
-  fallback: { api: 'openai-responses', base: 'https://api.openai.com/v1', label: 'OpenAI (fallback key)', free: false },
+// `trial`: terms limit it to prototyping / testing: last resort, no private data.
+export const SLOTS: Record<KeySlot, { api: Api; base: string; label: string; free: true; trial?: true }> = {
+  fallback: { api: 'openai-responses', base: 'https://api.openai.com/v1', label: 'OpenAI (free tier)', free: true },
   groq: { api: 'openai-chat', base: 'https://api.groq.com/openai/v1', label: 'Groq (free)', free: true },
   gemini: { api: 'openai-chat', base: 'https://generativelanguage.googleapis.com/v1beta/openai', label: 'Gemini (free)', free: true },
   // NVIDIA API catalog: free keys for prototyping / testing only (NVIDIA's terms).
-  nvidia: { api: 'openai-chat', base: 'https://integrate.api.nvidia.com/v1', label: 'NVIDIA (dev/test only)', free: true },
-  nvidia2: { api: 'openai-chat', base: 'https://integrate.api.nvidia.com/v1', label: 'NVIDIA (key 2) (dev/test only)', free: true },
+  nvidia: { api: 'openai-chat', base: 'https://integrate.api.nvidia.com/v1', label: 'NVIDIA (dev/test only)', free: true, trial: true },
+  nvidia2: { api: 'openai-chat', base: 'https://integrate.api.nvidia.com/v1', label: 'NVIDIA (key 2) (dev/test only)', free: true, trial: true },
 };
 export const KEY_SLOTS = Object.keys(SLOTS) as KeySlot[];
 export const isSlot = (s: unknown): s is KeySlot => typeof s === 'string' && (KEY_SLOTS as string[]).includes(s);
 export const endpointFor = (slot: KeySlot) => `${SLOTS[slot].base}${SLOTS[slot].api === 'openai-chat' ? '/chat/completions' : '/responses'}`;
 
 export type Target = { keySlot: KeySlot; model: string };
-export type Keys = { primary: string; fallback?: string | null; groq?: string | null; gemini?: string | null; nvidia?: string | null; nvidia2?: string | null };
+export type Keys = { fallback?: string | null; groq?: string | null; gemini?: string | null; nvidia?: string | null; nvidia2?: string | null };
 export type CatalogRow = {
   key_slot: KeySlot; model: string; available: boolean; supports_tools: boolean; supports_stream: boolean;
   free: boolean; params?: { omit?: string[]; token_budget?: number; extra_body?: Record<string, unknown> } | null; last_error?: string | null; reason?: string | null; checked_at?: string;
 };
-export const keyFor = (keys: Keys, slot: KeySlot): string | null => (slot === 'primary' ? keys.primary : keys[slot] ?? null) || null;
+export const keyFor = (keys: Keys, slot: KeySlot): string | null => keys[slot] || null;
 
-const BUILTINS = ALLOWED_MODELS as readonly string[];
+// The model that answers when nothing configured is usable: the first of the
+// default free chain (Gemini; see DEFAULT_FREE_CHAIN).
 const selectable = (c: CatalogRow) => c.available && c.supports_tools && c.supports_stream;
+// The OpenAI key is free-tier only: a model on it must be on the allow-list
+// AND marked free in the catalog (an uncatalogued key allows the list alone).
+const freeOpenAi = (m: string) => FREE_OPENAI_MODELS.includes(m);
 
-// Mirrors public.ai_model_usable (mig 397).
+// Mirrors public.ai_model_usable (mig 431).
 export function modelUsable(catalog: CatalogRow[], slot: KeySlot, model: string): boolean {
-  const builtin = slot === 'primary' && BUILTINS.includes(model);
+  if (!isSlot(slot)) return false;
+  if (slot === 'fallback' && !freeOpenAi(model)) return false;
   const rows = catalog.filter((c) => c.key_slot === slot);
-  // A built-in that failed its probe only for lack of credits stays choosable:
-  // it works again the moment the account is topped up.
-  if (rows.length) return rows.some((c) => c.model === model && (selectable(c) || (builtin && /quota|credit/i.test(c.last_error ?? ''))));
-  return builtin;
+  if (rows.length) return rows.some((c) => c.model === model && selectable(c) && (slot !== 'fallback' || c.free));
+  return true;       // a slot the refresh has not listed yet: tried anyway
 }
 
-// The Boss's list: the configured model (or the safe default), then the
-// fallbacks. Fallbacks need their key; a catalogued slot must list them as
-// usable (an uncatalogued one is tried anyway). Duplicates are dropped.
+// The default free chain, used when the configured chain yields no model at
+// all (a legacy config, an empty one). Order from wurx-buddy/model-benchmark.md.
+export const DEFAULT_FREE_CHAIN: Target[] = [
+  { keySlot: 'gemini', model: 'gemini-3.5-flash-lite' },
+  { keySlot: 'groq', model: 'openai/gpt-oss-120b' },
+  { keySlot: 'gemini', model: 'gemini-3.6-flash' },
+  { keySlot: 'fallback', model: 'gpt-6-luna' },
+];
+
+// The Boss's list: the configured model, then the fallbacks. An entry needs
+// its key and must be usable (a catalogued slot must list it; an uncatalogued
+// slot is tried anyway). Duplicates are dropped. An entry that names a slot
+// that no longer exists (the old paid 'primary') or a paid OpenAI model is
+// skipped, never fatal; if nothing is left, the default free chain runs. The
+// result is never empty.
 export function chooseTargets(cfg: { model?: unknown; model_key_slot?: unknown; fallback_models?: unknown; fallback_enabled?: unknown },
   catalog: CatalogRow[], keys: Keys, override?: string | Target | null): Target[] {
   const has = (slot: KeySlot) => !!keyFor(keys, slot);
-  let first: Target = { keySlot: isSlot(cfg.model_key_slot) ? cfg.model_key_slot : 'primary', model: String(cfg.model ?? '') };
-  if (override) first = typeof override === 'string' ? { keySlot: 'primary', model: override } : override;
-  // A local override (serve-assistant --model/--key-slot) is taken as given.
-  const trusted = !!override && typeof override !== 'string';
-  if (!has(first.keySlot) || (!trusted && !modelUsable(catalog, first.keySlot, first.model))) first = { keySlot: 'primary', model: DEFAULT_MODEL };
-  const out: Target[] = [first];
+  hydrateCooldowns(catalog);
+  const out: Target[] = [];
+  // A local override (serve-assistant --model/--key-slot) is taken as given,
+  // except that the free-only rule for the OpenAI key still holds.
+  const fromOverride = override && typeof override !== 'string' ? override : null;
+  const cand: Target | null = fromOverride ?? (override ? null : isSlot(cfg.model_key_slot) ? { keySlot: cfg.model_key_slot, model: String(cfg.model ?? '') } : null);
+  if (cand && cand.model && has(cand.keySlot) && (modelUsable(catalog, cand.keySlot, cand.model) || (fromOverride && !(cand.keySlot === 'fallback' && !freeOpenAi(cand.model))))) out.push(cand);
   if (cfg.fallback_enabled !== false && Array.isArray(cfg.fallback_models)) {
     for (const f of cfg.fallback_models.slice(0, MAX_FALLBACKS)) {
       if (!isSlot(f?.key_slot)) continue;
       const t: Target = { keySlot: f.key_slot, model: String(f?.model ?? '') };
-      if (!t.model || !has(t.keySlot)) continue;
+      if (!t.model || !has(t.keySlot) || (t.keySlot === 'fallback' && !freeOpenAi(t.model))) continue;
       const catalogued = catalog.some((c) => c.key_slot === t.keySlot);
       // A model that only failed the check for a passing provider error (503,
       // timeout) stays in the Boss's chain: seen live 2026-10-01 on gemini-3.5-flash.
@@ -81,6 +104,10 @@ export function chooseTargets(cfg: { model?: unknown; model_key_slot?: unknown; 
       out.push(t);
     }
   }
+  if (!out.length) for (const t of DEFAULT_FREE_CHAIN) if (has(t.keySlot)) out.push(t);
+  // Still nothing (no key at all): one doomed Gemini target, so the turn fails
+  // with a clear "key refused / missing" message instead of crashing.
+  if (!out.length) out.push(DEFAULT_FREE_CHAIN[0]);
   return out;
 }
 export const MAX_FALLBACKS = 6;
@@ -98,47 +125,82 @@ export function resolveRoleConfig<T extends Record<string, unknown>>(cfg: T, rol
   const rm = (cfg.role_models && typeof cfg.role_models === 'object' ? (cfg.role_models as Record<string, any>)[r] : null) ?? null;
   const out: any = { ...cfg, model_source: 'global' };
   if (!rm || typeof rm !== 'object') return out;
-  if (rm.model) { out.model = rm.model; out.model_key_slot = rm.key_slot ?? 'primary'; out.model_source = `role:${r}`; }
+  // A role model on a slot that no longer exists (or none: it used to mean the
+  // paid key) is ignored; the role's own fallbacks and the global chain remain.
+  if (rm.model && isSlot(rm.key_slot)) { out.model = rm.model; out.model_key_slot = rm.key_slot; out.model_source = `role:${r}`; }
   if (Array.isArray(rm.fallback_models)) { out.fallback_models = rm.fallback_models; out.model_source = `role:${r}`; }
   return out;
 }
 
 // The automatic safety net (auto_failover): every other usable catalog model
-// with a key, in this order: Gemini flash family, Groq, the OpenAI fallback
-// key, anything else.
-// Probe-passing models first (Lead 2026-10-01: 3.5-flash gave 503 on larger requests).
-const GEMINI_ORDER = ['gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-3.7-flash'];
+// with a key. Providers alternate so one outage or rate limit never empties it:
+// Gemini, then Groq, then the OpenAI free tier, and NVIDIA (trial terms) last.
+// Order from the 2026-11-02 benchmark (wurx-buddy/model-benchmark.md): fastest and
+// steadiest first; gemini-3.8-flash answered 503 / hung for 60 s, so it goes last.
+const GEMINI_ORDER = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
 const GROQ_ORDER = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'];
 export function netRank(t: Target): number {
   if (t.keySlot === 'gemini') {
     const i = GEMINI_ORDER.indexOf(t.model);
     if (i >= 0) return i;
     if (/flash-lite/.test(t.model)) return 10;
+    if (/3\.8-flash/.test(t.model)) return 25;
     if (/^gemma/.test(t.model)) return 20;
-    if (/flash/.test(t.model)) return 5;
+    if (/flash/.test(t.model)) return 15;
     return 30;
   }
-  if (t.keySlot === 'nvidia' || t.keySlot === 'nvidia2') return (t.keySlot === 'nvidia' ? 50 : 60) + (/nemotron/.test(t.model) ? 0 : /gpt-oss/.test(t.model) ? 1 : 5);
   if (t.keySlot === 'groq') { const i = GROQ_ORDER.indexOf(t.model); return 100 + (i >= 0 ? i : 10); }
   if (t.keySlot === 'fallback') return 200;
-  return 300;
+  if (t.keySlot === 'nvidia' || t.keySlot === 'nvidia2') return (t.keySlot === 'nvidia' ? 300 : 320) + (/nemotron/.test(t.model) ? 0 : /laguna/.test(t.model) ? 1 : /gpt-oss/.test(t.model) ? 2 : 5);
+  return 400;
 }
+// NVIDIA models that failed the 2026-11-02 benchmark (hang past the 20 s first-byte
+// limit, 404, or a minute per answer): not worth a wait as an automatic fallback.
+// The Boss can still choose one by hand.
+const NET_DENY = /^(meta\/muse-glimmer|google\/diffusiongemma|nvidia\/nemotron-3-super|openai\/gpt-oss-20b)/;
 export function safetyNet(catalog: CatalogRow[], keys: Keys, taken: Target[]): Target[] {
   return catalog
-    .filter((c) => selectable(c) && !!keyFor(keys, c.key_slot) && !taken.some((t) => t.keySlot === c.key_slot && t.model === c.model))
+    .filter((c) => isSlot(c.key_slot) && selectable(c) && !!keyFor(keys, c.key_slot) && (c.key_slot !== 'fallback' || (c.free && freeOpenAi(c.model)))
+      && !((c.key_slot === 'nvidia' || c.key_slot === 'nvidia2') && NET_DENY.test(c.model))
+      && !taken.some((t) => t.keySlot === c.key_slot && t.model === c.model))
     .map((c) => ({ keySlot: c.key_slot, model: c.model }))
     .sort((a, b) => netRank(a) - netRank(b) || a.model.localeCompare(b.model));
 }
 
 // ── cooldown: models that just failed, skipped by the next turns ────────────
 // In memory (per worker / process): a lost cooldown only costs one quick failure.
+// Edge workers are short-lived and many, so a cooldown is also written on the
+// model's catalog row (params.cooling) and read back from the catalog at the
+// start of every turn (chooseTargets → hydrateCooldowns): the next question,
+// on whichever worker, skips a provider that just said quota / auth / 429
+// without spending a request on it. A refused key (auth) cools the whole slot.
 export type Cooling = { until: number; issue: ProviderIssue | 'busy'; waitMs: number | null };
 const cooling = new Map<string, Cooling>();
 const ck = (t: Target) => `${t.keySlot}|${t.model}`;
+const slotKey = (slot: string) => `${slot}|*`;
 export const _resetCooldowns = () => cooling.clear();      // tests
 export function coolingDown(t: Target, now = Date.now()): Cooling | null {
-  const c = cooling.get(ck(t));
-  return c && c.until > now ? c : null;
+  for (const k of [ck(t), slotKey(t.keySlot)]) {
+    const c = cooling.get(k);
+    if (c && c.until > now) return c;
+  }
+  return null;
+}
+// Pull cooldowns other workers recorded into this worker's memory.
+export function hydrateCooldowns(catalog: CatalogRow[], now = Date.now()): void {
+  for (const c of catalog) {
+    const k = (c.params as any)?.cooling;
+    if (!k || !(Number(k.until) > now) || !isSlot(c.key_slot)) continue;
+    const key = k.slot_wide ? slotKey(c.key_slot) : `${c.key_slot}|${c.model}`;
+    const have = cooling.get(key);
+    if (!have || have.until < k.until) cooling.set(key, { until: Number(k.until), issue: k.issue ?? 'busy', waitMs: k.waitMs ?? null });
+  }
+}
+// Record the cooldown just set for `t` on its catalog row (best effort).
+export async function persistCooldown(admin: any, t: Target, catalog: CatalogRow[] = []): Promise<void> {
+  const c = cooling.get(ck(t)) ?? cooling.get(slotKey(t.keySlot));
+  if (!c) return;
+  await rememberParams(admin, t, { cooling: { until: c.until, issue: c.issue, waitMs: c.waitMs, slot_wide: cooling.has(slotKey(t.keySlot)) } }, catalog);
 }
 // How long a failure keeps a model out. A request that was too large says
 // nothing about the next (smaller) question, so it does not cool down.
@@ -149,7 +211,7 @@ export function coolDown(t: Target, e: unknown, now = Date.now()): void {
   let ms: number;
   if (issue === 'too_large') return;
   if (issue === 'quota') ms = 10 * 60_000;
-  else if (issue === 'auth') ms = 30 * 60_000;
+  else if (issue === 'auth') { cooling.set(slotKey(t.keySlot), { until: now + 30 * 60_000, issue: 'auth', waitMs: wait ?? null }); return; }
   else if (issue === 'limit') ms = Math.min(wait ?? 60 * 60_000, 60 * 60_000);
   else if (status === 429) ms = Math.min(Math.max(wait ?? 30_000, 5_000), 5 * 60_000);
   else ms = 60_000;                        // 5xx, a silent model, a timeout
@@ -215,17 +277,16 @@ const REASONS: [RegExp, string][] = [
 const DATED = /-(\d{4}-\d{2}-\d{2}|\d{4})$/;
 export function skipReason(slot: KeySlot, id: string, all: Set<string>): string | null {
   for (const [re, why] of REASONS) if (re.test(id)) return why;
-  if (SLOTS[slot].api === 'openai-responses') {
-    if (!/^(gpt|o\d)/i.test(id) || /chatgpt|dall|codex|search|instruct|computer/i.test(id)) return 'not a chat model';
-    if (/-pro\b|^o\d.*-pro/i.test(id)) return 'pro model (not for Buddy)';
-  }
+  // The OpenAI key is free-tier only: nothing but the listed free models is
+  // ever probed (a probe is a real call), so a refresh cannot bill the account.
+  if (SLOTS[slot].api === 'openai-responses' && !FREE_OPENAI_MODELS.includes(id)) return 'paid OpenAI model (Buddy uses free models only)';
   if (DATED.test(id) && all.has(id.replace(DATED, ''))) return 'dated snapshot (its alias is listed)';
   return null;
 }
-// Kept for the OpenAI-only callers and tests: the chat models of a key.
-export function chatModels(ids: string[]): string[] {
+// The chat models of a key.
+export function chatModels(ids: string[], slot: KeySlot = 'gemini'): string[] {
   const all = new Set(ids);
-  return ids.filter((id) => !skipReason('primary', id, all)).sort();
+  return ids.filter((id) => !skipReason(slot, id, all)).sort();
 }
 
 // A failed probe → the reason the settings screen shows.
@@ -352,8 +413,8 @@ export async function refreshModels(o: { keys: Keys; admin: any; prices: Prices;
       }
     };
     await Promise.all(Array.from({ length: Math.min(o.concurrency ?? 4, probeList.length) }, worker));
-    // OpenAI: free = answered while this key had no credits, or a known price of 0.
-    if (!chat) for (const r of rows) { const p = o.prices[r.model]; r.free = r.available && (exhausted || (!!p && p.in === 0 && p.out === 0)); }
+    // OpenAI: only the allow-listed free-tier models are probed; they are free by definition.
+    if (!chat) for (const r of rows) r.free = r.available && FREE_OPENAI_MODELS.includes(r.model);
     rows.sort((a, b) => a.model.localeCompare(b.model));
     result.slots[slot] = {
       listed: ids.length, probed: probeList.length, available: rows.filter((r) => r.available).length,

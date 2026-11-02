@@ -166,6 +166,10 @@ portals — everything an agency needs.
   `wurx-buddy/supabase/` any more. The unit tests live beside the code in
   `supabase/functions/_shared/ai/__tests__/` (run `npm test` from the repo root, no network);
   `wurx-buddy/` holds the design docs, runbooks, dev scripts and app guides.
+- **Chat models are FREE only** (migration 431, 2026-11-02): Gemini, Groq, the OpenAI free tier (slot
+  `fallback`, `gpt-6-luna` only, enforced in `llm/openai.ts`) and NVIDIA as a last resort (trial terms, never
+  for people/pay data). There is no paid OpenAI key and no `primary` slot. The order and the evidence are in
+  `wurx-buddy/model-benchmark.md`.
 - **Taking it to production:** follow `wurx-buddy/prompt.md` step by step.
 - `wurx-buddy/` scripts are dev-only and read `../.env.dev` (repo root, gitignored).
 - The Supabase CLI is **not** pre-linked on a fresh machine (the "already linked" note above
