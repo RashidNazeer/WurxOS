@@ -47,7 +47,7 @@ portals — everything an agency needs.
 
 ### Migrations
 - Live in `supabase/migrations/*.sql`. Naming: `NNN_short_name.sql`. Highest is
-  **428** (next available is 429), as of 2026-10-28. Don't trust this number
+  **429** (next available is 430), as of 2026-11-02. Don't trust this number
   blindly — `ls` the folder, it moves most weeks.
 - **NEVER reuse a number, even on a different branch.** The CLI keys its ledger
   on the numeric prefix alone, so two files sharing one number means only one
