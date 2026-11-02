@@ -11,7 +11,7 @@ import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
 import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
-import { chooseTargets, coolDown, coolingDown, endpointFor, extraFor, isThinking, keyFor, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
+import { chooseTargets, coolDown, coolingDown, persistCooldown, endpointFor, extraFor, isThinking, keyFor, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
 import { chatRespond } from '../llm/chat.ts';
 import { stripToolMarkup } from '../llm/textTools.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
@@ -81,8 +81,7 @@ export type CoreDeps = {
   searchRpc: Rpc;                    // search RPCs as the caller (JWT) or service role + asUser
   asUser: string | null;
   userClient?: any;                  // supabase-js client with the caller's JWT (data tools, RLS); absent = none
-  apiKey: string;                    // OPEN_AI_API_KEY (the 'primary' slot)
-  fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot)
+  fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot: the OpenAI FREE tier; there is no paid key)
   groqKey?: string | null;           // GROQ_API_KEY (the 'groq' slot, Chat Completions)
   geminiKey?: string | null;         // GEMINI_API_KEY (the 'gemini' slot, Chat Completions)
   nvidiaKey?: string | null;         // NVIDIA_API_KEY (the 'nvidia' slot; free, dev/test only)
@@ -220,7 +219,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   // fallbacks. `target` moves down it on an account error (no credits, key refused).
   let catalog: CatalogRow[] = deps.catalog ?? [];
   if (!deps.catalog) { try { catalog = (await admin.from('ai_model_catalog').select('*')).data ?? []; } catch { catalog = []; } }
-  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null,
+  const keys: Keys = { fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null,
     nvidia: deps.nvidiaKey ?? null, nvidia2: deps.nvidia2Key ?? null };
   const override: string | Target | null = deps.model ? (deps.modelKeySlot ? { keySlot: deps.modelKeySlot, model: deps.model } : deps.model) : null;
   // Per-role models (mig 404): the Boss / a developer picks the model per role.
@@ -402,19 +401,17 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     for (let paramTries = 0; ;) {
       // A model that just failed for quota / limit / a refused key is skipped
       // (the last one left is always tried).
-      // Pay data must not fail over onto a free tier. Once a people/pay tool
-      // has returned, its output is in `input`, and every later model call
-      // carries it — so a quota error on the paid key would have handed
-      // salaries to Gemini/Groq/NVIDIA free endpoints, whose terms are not
-      // what we would choose for payroll (QA F8). Free slots are skipped from
-      // that moment; if only free ones remain the turn fails, which is the
-      // right way round.
+      // Every model is on a free tier now (Owner 2026-11-02), so people / pay
+      // data goes to the free providers the Boss configured. The one exception:
+      // NVIDIA's API-catalog keys are for prototyping / testing only (their
+      // terms), so once a people/pay tool has returned, those slots are skipped
+      // and, if nothing else is left, the turn fails rather than send payroll there.
       if (turnGuard?.sensitiveUsed) {
-        for (let guard = 0; SLOTS[target.keySlot].free && ti + 1 < targets.length && guard < targets.length; guard++) {
+        for (let guard = 0; SLOTS[target.keySlot].trial && ti + 1 < targets.length && guard < targets.length; guard++) {
           ((flags.skipped_free_tier ??= []) as string[]).push(tag(target));
-          moveOn('private data in this turn: free tiers skipped');
+          moveOn('private data in this turn: trial-terms slots skipped');
         }
-        if (SLOTS[target.keySlot].free) throw new Error('No non-free model is available, and this turn has read private data.');
+        if (SLOTS[target.keySlot].trial) throw new Error('No model allowed for private data is available.');
       }
       for (let c = coolingDown(target); c && ti + 1 < targets.length; c = coolingDown(target)) {
         ((flags.skipped_cooling ??= []) as string[]).push(tag(target));
@@ -480,7 +477,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
           continue;
         }
         if (issue) chainIssues.push({ issue, model: target.model, slot: target.keySlot, waitMs: (e as any)?.retryAfterMs ?? null });
-        if (!(e as any)?.streamed) coolDown(target, e);
+        if (!(e as any)?.streamed) { coolDown(target, e); void persistCooldown(admin, target, catalog); }   // not awaited: no DB write between a failed model and the next
         const status = Number((e as any)?.status);
         const why = issue ?? ((e as any)?.code === 'bad_tool_format' ? 'bad_tool_format'
           : status === 429 ? 'rate_limit' : (e as any)?.code === 'first_byte_timeout' ? 'no_response' : status >= 500 ? 'server_error' : 'error');

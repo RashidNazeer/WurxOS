@@ -559,7 +559,7 @@ function ModelCard({ readOnly }) {
     listKeySlots().then((rows) => setMeta(keySlotMeta(rows)));
     Promise.all([listModelCatalog(), getModelConfig()]).then(([cat, cfg]) => {
       const c = {
-        model: cfg.model || 'gpt-5.4-mini', model_key_slot: cfg.model_key_slot || 'primary',
+        model: cfg.model || 'gemini-3.5-flash-lite', model_key_slot: cfg.model_key_slot === 'primary' ? 'gemini' : (cfg.model_key_slot || 'gemini'),
         fallback_models: Array.isArray(cfg.fallback_models) ? cfg.fallback_models : [],
         fallback_enabled: cfg.fallback_enabled !== false,
         // Absent until its migration lands; then default on.
@@ -620,7 +620,7 @@ function ModelCard({ readOnly }) {
       {noCredits && (
         <div className="bd-banner" role="alert">
           <i className="bi bi-exclamation-triangle" aria-hidden="true" />
-          <span>Main OpenAI key has no credits: Buddy is answering with the free fallback. Top up at platform.openai.com → Billing.</span>
+          <span>The main model's key has no quota left: Buddy is answering with its backup models.</span>
         </div>
       )}
       {loadErr && <LoadError what="the model settings" onRetry={load} compact />}
@@ -713,7 +713,7 @@ function ModelCard({ readOnly }) {
               </div>
             )}
             <div className="bd-card-sub mt-1">
-              Tried in this order when the main model fails because of credits or the key (up to {FALLBACK_MAX}). Free models may share data with their provider (OpenAI, Google, Groq); check each project's data-sharing setting.
+              Tried in this order when the main model fails (quota, rate limit or the key; up to {FALLBACK_MAX}). Buddy uses free models only. Free tiers may keep or learn from what they are sent (OpenAI free tier, Google, Groq); NVIDIA keys are for testing only and are used as a last resort, never for people or pay data.
             </div>
             {'auto_failover' in draft && (
               <div className="form-check form-switch mt-2">
@@ -724,7 +724,7 @@ function ModelCard({ readOnly }) {
               </div>
             )}
           </fieldset>
-          <div className="bd-card-sub mt-1">The Slack relay still runs on the older engine: it uses the chosen model only if it is gpt-5.4-mini or gpt-5.5, otherwise mini, and it has no fallbacks.</div>
+          <div className="bd-card-sub mt-1">The Slack relay answers through the same Buddy engine, with the same models and backups.</div>
 
           {!readOnly && (
             <div className="d-flex align-items-center gap-2 flex-wrap mt-3">

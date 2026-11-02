@@ -207,7 +207,8 @@ async function handleEvent(ev: Record<string, any>, eventId: string) {
   let answer = '';
   let failure = '';
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-chat`, {
+    // Buddy v2 (free models only); the old ai-chat function runs on the paid OpenAI key.
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/assistant`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

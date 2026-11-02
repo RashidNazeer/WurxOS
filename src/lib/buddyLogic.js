@@ -584,7 +584,7 @@ export const USAGE_KIND_LABEL = {
 // catalog are still shown, under their own name, after the known ones.
 export const KEY_SLOTS = ['primary', 'fallback', 'gemini', 'groq'];
 export const KEY_SLOT_LABEL = {
-  primary: 'OpenAI', fallback: 'OpenAI (fallback key)', gemini: 'Gemini (free)', groq: 'Groq (free)',
+  primary: 'OpenAI (removed)', fallback: 'OpenAI (free tier)', gemini: 'Gemini (free)', groq: 'Groq (free)',
 };
 export const DEFAULT_SLOT_META = { order: KEY_SLOTS, labels: KEY_SLOT_LABEL };
 

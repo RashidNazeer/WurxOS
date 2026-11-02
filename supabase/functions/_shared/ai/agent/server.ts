@@ -76,8 +76,8 @@ export async function checkProfile(admin: any, userId: string, token: string | n
 
 export type ServerEnv = {
   url: string; serviceKey: string; anonKey: string; createClient: CreateClient; fetchImpl?: typeof fetch; modelOverride?: string;
-  openAiKey: string;                     // OPEN_AI_API_KEY: the 'primary' key slot
-  openAiKeyFallback?: string | null;     // OPEN_AI_API_KEY_FALLBACK: the 'fallback' key slot (optional)
+  openAiKey: string;                     // OPEN_AI_API_KEY: EMBEDDINGS / RERANK ONLY (retrieval side); no chat model uses it
+  openAiKeyFallback?: string | null;     // OPEN_AI_API_KEY_FALLBACK: the 'fallback' key slot = OpenAI FREE tier (optional)
   groqKey?: string | null;               // GROQ_API_KEY: the 'groq' key slot (optional, free tier)
   geminiKey?: string | null;             // GEMINI_API_KEY: the 'gemini' key slot (optional, free tier)
   nvidiaKey?: string | null;             // NVIDIA_API_KEY: the 'nvidia' key slot (optional; free, dev/test only)
@@ -153,7 +153,6 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     // decides for non-Boss callers. Without a JWT (Slack relay: Boss-only;
     // local --as-user) there is none, and non-Boss people tools refuse.
     ...(userClient ? { userClient } : {}),
-    apiKey: env.openAiKey,
     ...(env.modelOverride ? { model: env.modelOverride, ...(env.modelKeySlot ? { modelKeySlot: env.modelKeySlot } : {}) } : {}),
     fallbackKey: env.openAiKeyFallback ?? null,
     groqKey: env.groqKey ?? null,
@@ -188,7 +187,7 @@ export async function handleAsk(env: ServerEnv, admin: any, caller: Caller, body
     const slots = Array.isArray(body?.slots) ? body.slots.filter(isSlot) : undefined;
     const { data: cfg } = await admin.from('ai_assistant_config').select('prices').eq('id', 1).maybeSingle();
     try {
-      const r = await refreshModels({ keys: { primary: env.openAiKey, fallback: env.openAiKeyFallback ?? null, groq: env.groqKey ?? null, gemini: env.geminiKey ?? null,
+      const r = await refreshModels({ keys: { fallback: env.openAiKeyFallback ?? null, groq: env.groqKey ?? null, gemini: env.geminiKey ?? null,
         nvidia: env.nvidiaKey ?? null, nvidia2: env.nvidia2Key ?? null },
         admin, prices: pricesFrom(cfg?.prices), fetchImpl: env.fetchImpl, ...(slots?.length ? { slots } : {}) });
       return { response: json(r), done: Promise.resolve() };

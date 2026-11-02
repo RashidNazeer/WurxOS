@@ -60,8 +60,7 @@ const aboutHours = (ms: number) => (ms >= 5_400_000 ? `about ${Math.round(ms / 3
 
 // Per key slot: who to blame, and which function secret holds the key.
 const SLOT_INFO: Record<string, { provider: string; secret: string; openai: boolean }> = {
-  primary: { provider: 'OpenAI', secret: 'OPEN_AI_API_KEY', openai: true },
-  fallback: { provider: 'OpenAI', secret: 'OPEN_AI_API_KEY_FALLBACK', openai: true },
+  fallback: { provider: 'OpenAI (free tier)', secret: 'OPEN_AI_API_KEY_FALLBACK', openai: true },
   groq: { provider: 'Groq', secret: 'GROQ_API_KEY', openai: false },
   gemini: { provider: 'Gemini', secret: 'GEMINI_API_KEY', openai: false },
   nvidia: { provider: 'NVIDIA', secret: 'NVIDIA_API_KEY', openai: false },
@@ -82,10 +81,9 @@ export function providerIssueMessage(issue: ProviderIssue, role: string, chain: 
   }
   const parts = new Set<string>();
   for (const c of all) {
-    const s = SLOT_INFO[c.slot ?? 'primary'] ?? SLOT_INFO.primary;
+    const s = SLOT_INFO[c.slot ?? 'gemini'] ?? SLOT_INFO.gemini;
     if (c.issue === 'quota') {
-      parts.add(s.openai ? 'OpenAI credits are used up: top up the OpenAI account (platform.openai.com → Billing).'
-        : `${s.provider} has no free quota left on its key${c.model ? ` (${c.model})` : ''}.`);
+      parts.add(`${s.provider} has no free quota left on its key${c.model ? ` (${c.model})` : ''}.`);
     } else if (c.issue === 'auth') {
       parts.add(`${s.provider} refused an API key: check the ${s.secret} secret of the assistant function.`);
     } else if (c.issue === 'limit') {
