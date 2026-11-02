@@ -472,7 +472,7 @@ test('get_reports: non-USD lines carry their currency; USD lines stay v1-identic
 
 test('get_performance: composites 4 at a time, one retry, failures said and ranked last', async () => {
   const ratings = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => ({ user_id: id, month: '2026-08', metrics: {}, overall_score: 90 - i }));
-  const profiles = ratings.map((r, i) => ({ id: r.user_id, display_name: `Person ${i + 1}`, role: 'apc', deleted_at: null }));
+  const profiles = ratings.map((r, i) => ({ id: r.user_id, display_name: `Person ${i + 1}`, role: 'apc', is_active: true, deleted_at: null }));
   let inFlight = 0, peak = 0;
   const tries = new Map<string, number>();
   const db = fakeDb({ performance_ratings: ratings, profiles, performance_flags: [], performance_warnings: [] }, {
@@ -489,10 +489,71 @@ test('get_performance: composites 4 at a time, one retry, failures said and rank
   const r = await runDataTool(db, BOSS, 'get_performance', { month: '2026-08' });
   assert.ok(peak <= 4, `peak ${peak}`);
   assert.equal(tries.get('p1'), 2);
-  assert.match(r.text, /- Person 2 — composite 52\.0\/100 — Good/);
+  assert.match(r.text, /- Person 2 \(APC\) — composite 52\.0\/100 — Good/);
   const lines = r.text.split('\n').filter((l) => l.startsWith('- Person'));
-  assert.match(lines[lines.length - 1], /^- Person 1 — composite could not be loaded \(lookup failed\), so this is NOT the Performance page figure/);
+  assert.match(lines[lines.length - 1], /^- Person 1 \(APC\) — composite could not be loaded \(lookup failed\), so this is NOT the Performance page figure/);
   assert.match(r.text, /\(The composite could not be loaded for 1 of 6; they are listed last/);
+});
+
+test('get_performance (ranking): Team Leads without a rating row are ranked, and former employees are never ranked as staff', async () => {
+  // The real October shape: APCs have rating rows; TLs have NONE (their score is computed);
+  // a rated APC has since left (is_active false, deleted).
+  const profiles = [
+    { id: 'apc-new', display_name: 'Haseeb', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'apc-two', display_name: 'Umair Tariq', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'apc-gone', display_name: 'Ali Ahmad', role: 'apc', is_active: false, deleted_at: '2026-10-12' },
+    { id: 'tl-a', display_name: 'Muhammad Azam', role: 'tl', is_active: true, deleted_at: null },
+    { id: 'tl-b', display_name: 'Ali Hamza', role: 'tl', is_active: true, deleted_at: null },
+    { id: 'boss', display_name: 'The Boss', role: 'boss', is_active: true, deleted_at: null },
+  ];
+  const ratings = [
+    { user_id: 'apc-new', month: '2026-10', metrics: {}, overall_score: 60 },
+    { user_id: 'apc-two', month: '2026-10', metrics: {}, overall_score: 61 },
+    { user_id: 'apc-gone', month: '2026-10', metrics: {}, overall_score: 12.8 },
+  ];
+  const comp: Record<string, any> = {
+    'apc-new': { composite_score: 89, level: 'good' }, 'apc-two': { composite_score: 83, level: 'good' },
+    'apc-gone': { composite_score: 56, level: 'warning' },
+    'tl-a': { composite_score: 78, level: 'good' }, 'tl-b': { composite_score: 61, level: 'warning' },
+  };
+  const db = fakeDb({ performance_ratings: ratings, profiles, performance_flags: [], performance_warnings: [] },
+    { get_performance_composite: (a: any) => (comp[a.p_user] ? [comp[a.p_user]] : []) });
+  const r = await runDataTool(db, BOSS, 'get_performance', { month: '2026-10' });
+  // both roles are present, each name carries its role, and the TL ranking is right
+  assert.match(r.text, /\(TL\) \(2\):\n- Muhammad Azam \(TL\) — composite 78\.0\/100 — Good[^\n]*\n- Ali Hamza \(TL\) — composite 61\.0\/100 — Warning/);
+  assert.match(r.text, /\(APC\) \(2\):\n- Haseeb \(APC\) — composite 89\.0\/100 — Good[^\n]*\n- Umair Tariq \(APC\) — composite 83\.0\/100/);
+  // the former employee is NOT in any ranked group, but is named as left out
+  const ranked = r.text.split('NOT ranked')[0];
+  assert.doesNotMatch(ranked, /Ali Ahmad/);
+  assert.match(r.text, /NOT ranked — no longer active[^\n]*: Ali Ahmad \(APC\)\. Never present them as current employees/);
+  assert.doesNotMatch(r.text, /The Boss/);
+  // a role filter returns that role only
+  const tls = await runDataTool(db, BOSS, 'get_performance', { month: '2026-10', role: 'tl' });
+  assert.match(tls.text, /^Performance for 2026-10 — 2 active Team Lead/);
+  assert.doesNotMatch(tls.text, /Haseeb|Umair/);
+  assert.doesNotMatch(tls.text, /Ali Ahmad/);       // an APC, so not mentioned under a TL question
+});
+
+test('get_performance (ranking): withheld, unrated and unseen people are never ranked on a different number', async () => {
+  const profiles = [
+    { id: 'a', display_name: 'Scored', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'b', display_name: 'Withheld', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'c', display_name: 'Unrated', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'd', display_name: 'Not Yours', role: 'apc', is_active: true, deleted_at: null },
+  ];
+  const ratings = [{ user_id: 'a', month: '2026-10', metrics: {}, overall_score: 10 }, { user_id: 'b', month: '2026-10', metrics: {}, overall_score: 99 }];
+  const comp: Record<string, any> = {
+    a: { composite_score: 70, level: 'good' }, b: { composite_score: null, level: 'pending_verification' }, c: { composite_score: null, level: 'not_rated' },
+  };
+  const db = fakeDb({ performance_ratings: ratings, profiles, performance_flags: [], performance_warnings: [] },
+    { get_performance_composite: (a: any) => (comp[a.p_user] ? [comp[a.p_user]] : []) });
+  const r = await runDataTool(db, BOSS, 'get_performance', { month: '2026-10' });
+  assert.match(r.text, /- Scored \(APC\) — composite 70\.0\/100 — Good/);   // the only ranked line
+  assert.match(r.text, /- Composite withheld \(incentive plan not yet verified by the OL\): Withheld/);
+  assert.match(r.text, /- No score this month \(not rated yet\): Unrated/);
+  assert.ok(r.text.indexOf('Scored (APC)') < r.text.indexOf('Composite withheld') && r.text.indexOf('Composite withheld') < r.text.indexOf('No score this month'));
+  assert.doesNotMatch(r.text, /Withheld \(APC\)|Unrated \(APC\)/);          // never given a number of their own
+  assert.doesNotMatch(r.text, /Not Yours/);                                  // nothing the caller may see about them
 });
 
 test('no report vs unapproved report: never blurred (Buddy smoke), in text and data', async () => {

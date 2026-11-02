@@ -363,13 +363,34 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
     const { data: mx } = await db.from('performance_ratings').select('month').order('month', { ascending: false }).limit(1);
     month = mx?.[0]?.month || '';
   }
+
+  // RANKING (no name): the people come from PROFILES, not from performance_ratings.
+  // That table only holds a row for someone who was rated, so ranking from it had two
+  // faults. A Team Lead's performance is computed (reports + team), so in a current
+  // month they have no row and silently vanished from "who is highest". And a rating
+  // row outlives the employee, so people who had LEFT were ranked beside current staff,
+  // with nothing in the text to say so or to say what their role was. Only active,
+  // non-deleted staff are ranked here; the Boss carries no score. `role` narrows it.
+  const roleArg = String(args?.role || '').trim().toLowerCase();
+  let roster: any[] | null = null;
+  if (!userIds) {
+    let pq = db.from('profiles').select('id, display_name, role')
+      .is('deleted_at', null).eq('is_active', true).neq('role', 'boss').limit(500);
+    // Developers are not performance-rated; they appear only when asked for by role.
+    pq = roleArg ? pq.eq('role', roleArg) : pq.neq('role', 'developer');
+    const { data: ppl } = await pq;
+    roster = ppl || [];
+  }
+  const rosterIds = roster ? roster.map((p: any) => p.id) : null;
+
   let rq = db.from('performance_ratings')
     .select('user_id, month, metrics, overall_score')
     .eq('month', month);
   if (userIds) rq = rq.in('user_id', userIds);
-  const { data: ratings } = await rq;
+  else if (rosterIds && rosterIds.length) rq = rq.in('user_id', rosterIds);
+  const { data: ratings } = rosterIds && !rosterIds.length ? { data: [] } : await rq;
 
-  const ids = [...new Set([...(ratings || []).map((r: any) => r.user_id), ...(userIds || [])])];
+  const ids = [...new Set([...(ratings || []).map((r: any) => r.user_id), ...(userIds || []), ...(rosterIds || [])])];
   const { data: profs } = ids.length
     ? await db.from('profiles').select('id, display_name, role').in('id', ids)
     : { data: [] };
@@ -379,7 +400,7 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
   // Composite headline (contract C3): the SAME number + level the Performance
   // page shows, via get_performance_composite, not overall_score (which is only
   // the manager-metrics pillar).
-  const compUserIds: string[] = userIds || [...new Set((ratings || []).map((r: any) => r.user_id))].filter(Boolean) as string[];
+  const compUserIds: string[] = userIds || [...new Set([...(rosterIds || []), ...(ratings || []).map((r: any) => r.user_id)])].filter(Boolean) as string[];
   // v1 fired every call at once and silently fell back when one failed, so the
   // same question gave different headlines (WP-B, Lead decision 5). Here: at
   // most 4 at a time, one retry, and a failure is said, never hidden.
@@ -447,10 +468,12 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
   }
   let fq = db.from('performance_flags').select('user_id, type, severity, reason, created_at').order('created_at', { ascending: false }).limit(userIds ? 30 : 50);
   if (userIds) fq = fq.in('user_id', userIds);
+  else if (rosterIds && rosterIds.length) fq = fq.in('user_id', rosterIds);
   if (monthRange) fq = fq.gte('created_at', monthRange.gte).lt('created_at', monthRange.lt);
   const { data: flags } = await fq;
   let wq = db.from('performance_warnings').select('user_id, reason, severity, created_at').order('created_at', { ascending: false }).limit(userIds ? 30 : 50);
   if (userIds) wq = wq.in('user_id', userIds);
+  else if (rosterIds && rosterIds.length) wq = wq.in('user_id', rosterIds);
   if (monthRange) wq = wq.gte('created_at', monthRange.gte).lt('created_at', monthRange.lt);
   const { data: warns } = await wq;
 
@@ -465,7 +488,68 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
 
   const whoLabel = month ? ` in ${month}` : '';
   let text = '';
-  if (ratings && ratings.length) {
+  if (roster) {
+    const ratingOf = new Map((ratings || []).map((r: any) => [r.user_id, r]));
+    // Keep someone only when the caller can see something about them: a rating row or a
+    // composite answer (RLS and get_performance_composite withhold what is not theirs).
+    const people = roster.filter((p: any) => ratingOf.has(p.id) || compMap.has(p.id) || compFailed.has(p.id));
+    // One scale only: the composite. Failed and withheld lookups and people with no
+    // composite sort after everyone who has one, never mixed in by a different number.
+    const rank = (p: any) => {
+      if (compFailed.has(p.id)) return -2;
+      const c = compMap.get(p.id);
+      if (c && c.level === 'pending_verification') return -1;
+      return c && c.composite_score != null ? Number(c.composite_score) : -3;
+    };
+    const code = (role: unknown) => String(role || '?').toUpperCase().replace(/_/g, ' ');
+    const lineOf = (p: any) => {
+      const r = ratingOf.get(p.id);
+      const head = headlineOf(p.id) || 'no composite score this month (not rated yet)';
+      const detail = r
+        ? `manager-metrics avg ${r.overall_score != null ? Number(r.overall_score).toFixed(1) : '?'}/100`
+        : 'no manager-metric ratings stored for this month';
+      return `- ${p.display_name} (${code(p.role)}) — ${head} (${detail})`;
+    };
+    // People with no score (not rated yet, or withheld) share ONE line per group
+    // instead of one each, so the ranked names stay easy to read.
+    const hasScore = (p: any) => rank(p) >= 0;
+    const withheldOf = (p: any) => !compFailed.has(p.id) && compMap.get(p.id)?.level === 'pending_verification';
+    const ROLE_ORDER = ['ol', 'pctl', 'tl', 'apc', 'ipc', 'ads_manager', 'developer'];
+    const roles = [...new Set(people.map((p: any) => p.role))]
+      .sort((a: any, b: any) => (ROLE_ORDER.indexOf(a) < 0 ? 99 : ROLE_ORDER.indexOf(a)) - (ROLE_ORDER.indexOf(b) < 0 ? 99 : ROLE_ORDER.indexOf(b)));
+    if (!people.length) {
+      text += `No performance data for ${roleArg ? roleLabelOf(roleArg) : 'active staff'}${whoLabel || ' (no data)'}.`;
+    } else {
+      text += `Performance for ${month} — ${people.length} active ${roleArg ? roleLabelOf(roleArg) : 'staff'}, ranked by composite score within each role `
+        + '(the same figure the Performance page shows). Each name carries its role; former employees are not included.';
+      for (const role of roles) {
+        const grp = people.filter((p: any) => p.role === role).sort((a: any, b: any) => rank(b) - rank(a));
+        const scored = grp.filter(hasScore);
+        const failed = grp.filter((p: any) => compFailed.has(p.id));
+        const withheld = grp.filter(withheldOf);
+        const none = grp.filter((p: any) => !hasScore(p) && !compFailed.has(p.id) && !withheldOf(p));
+        text += `\n\n${roleLabelOf(role)} (${grp.length}):`;
+        if (scored.length) text += `\n${scored.map(lineOf).join('\n')}`;
+        if (failed.length) text += `\n${failed.map(lineOf).join('\n')}`;
+        if (withheld.length) text += `\n- Composite withheld (incentive plan not yet verified by the OL): ${withheld.map((p: any) => p.display_name).join(', ')}`;
+        if (none.length) text += `\n- No score this month (not rated yet): ${none.map((p: any) => p.display_name).join(', ')}`;
+      }
+      if (compFailed.size) text += `\n\n(The composite could not be loaded for ${compFailed.size} of ${compUserIds.length}; they are listed last and are not ranked by composite. Ask again to retry.)`;
+    }
+    // People who were rated that month but have since left: named, so they are never
+    // mistaken for current staff and the answer can say they were left out.
+    const { data: allRated } = await db.from('performance_ratings').select('user_id').eq('month', month);
+    const inRoster = new Set(rosterIds);
+    const goneIds = [...new Set((allRated || []).map((x: any) => x.user_id))].filter((id: any) => !inRoster.has(id));
+    if (goneIds.length) {
+      let gq = db.from('profiles').select('display_name, role').in('id', goneIds);
+      if (roleArg) gq = gq.eq('role', roleArg);
+      const { data: gone } = await gq;
+      if (gone && gone.length) {
+        text += `\n\nNOT ranked — no longer active (left the company or deactivated) but with a rating in ${month}: ${gone.map((g: any) => `${g.display_name} (${code(g.role)})`).join(', ')}. Never present them as current employees.`;
+      }
+    }
+  } else if (ratings && ratings.length) {
     // A failed composite ranks last: its metrics average is a different number.
     const score = (r: any) => (compFailed.has(r.user_id) ? -2 : compScoreOf(r));
     const sorted = ratings.slice().sort((a: any, b: any) => score(b) - score(a));

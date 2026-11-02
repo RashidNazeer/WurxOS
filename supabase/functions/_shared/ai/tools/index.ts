@@ -80,6 +80,7 @@ export const TOOL_DEFS: ToolDef[] = [
       type: 'object',
       properties: {
         person_name: { type: 'string', description: 'Employee name; omit to get everyone (e.g. for ranking).' },
+        role: { type: 'string', enum: ['apc', 'ipc', 'tl', 'pctl', 'ol', 'ads_manager'], description: 'Only when ranking (no person_name): limit to one role, e.g. "tl" for the Team Lead ranking. Omit to get every active role, listed in role groups.' },
         month: { type: 'string', description: 'YYYY-MM, e.g. "2026-06". Omit for the latest month that has ratings.' },
       },
     },
