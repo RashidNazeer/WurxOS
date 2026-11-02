@@ -470,7 +470,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
           continue;
         }
         if (issue) chainIssues.push({ issue, model: target.model, slot: target.keySlot, waitMs: (e as any)?.retryAfterMs ?? null });
-        if (!(e as any)?.streamed) { coolDown(target, e); await persistCooldown(admin, target, catalog); }
+        if (!(e as any)?.streamed) { coolDown(target, e); void persistCooldown(admin, target, catalog); }   // not awaited: no DB write between a failed model and the next
         const status = Number((e as any)?.status);
         const why = issue ?? ((e as any)?.code === 'bad_tool_format' ? 'bad_tool_format'
           : status === 429 ? 'rate_limit' : (e as any)?.code === 'first_byte_timeout' ? 'no_response' : status >= 500 ? 'server_error' : 'error');

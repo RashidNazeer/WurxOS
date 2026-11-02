@@ -135,6 +135,6 @@ test('the automatic safety net: Gemini by benchmark rank, then Groq, the OpenAI 
     row('nvidia', 'google/diffusiongemma-26b-a4b-it'), row('nvidia', 'nvidia/nemotron-3-super-120b-a12b'), row('nvidia', 'openai/gpt-oss-20b')];
   const net = safetyNet(cat, { gemini: 'g', groq: 'q', fallback: 'f', nvidia: 'n' }, []);
   assert.deepEqual(net.map((t) => `${t.keySlot}:${t.model}`), [
-    'gemini:gemini-3.5-flash-lite', 'gemini:gemini-3.6-flash', 'gemini:gemini-3-flash-preview', 'gemini:gemini-3.8-flash',
+    'gemini:gemini-3.5-flash-lite', 'gemini:gemini-3-flash-preview', 'gemini:gemini-3.6-flash', 'gemini:gemini-3.8-flash',
     'groq:openai/gpt-oss-120b', 'fallback:gpt-6-luna', 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', 'nvidia:poolside/laguna-xs-2.1']);   // ultra first: slower (11 s) but it invented nothing in the benchmark; laguna added claims
 });

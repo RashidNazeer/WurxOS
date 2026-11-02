@@ -16,9 +16,10 @@
 --                 free-tier key.
 --
 -- The chain (wurx-buddy/model-benchmark.md; real calls through Buddy's own prompt
--- and tools, 2026-11-02): the fastest Gemini first, then a more careful Gemini
--- (its own quota bucket), then other providers so one provider's outage or rate
--- limit never takes Buddy down. NVIDIA keys are for testing only per NVIDIA's
+-- and tools, 2026-11-02): the fastest Gemini first, a second Gemini (its own quota
+-- bucket), then other providers so one provider's outage or rate limit never takes
+-- Buddy down. gemini-3.6-flash is careful but capped at 20 requests a DAY on the
+-- free tier, so it comes last. NVIDIA keys are for testing only per NVIDIA's
 -- terms: they are not in the chain, only the last step of the automatic safety
 -- net, and never see people / pay data.
 --
@@ -129,11 +130,11 @@ update public.ai_assistant_config set
   provider        = 'free',
   model           = 'gemini-3.5-flash-lite',
   model_key_slot  = 'gemini',
-  fallback_models = '[{"key_slot": "gemini", "model": "gemini-3.6-flash"},
+  fallback_models = '[{"key_slot": "gemini", "model": "gemini-3-flash-preview"},
                       {"key_slot": "groq", "model": "openai/gpt-oss-120b"},
                       {"key_slot": "fallback", "model": "gpt-6-luna"},
-                      {"key_slot": "gemini", "model": "gemini-3-flash-preview"},
-                      {"key_slot": "gemini", "model": "gemini-flash-lite-latest"}]'::jsonb,
+                      {"key_slot": "gemini", "model": "gemini-flash-lite-latest"},
+                      {"key_slot": "gemini", "model": "gemini-3.6-flash"}]'::jsonb,
   fallback_enabled = true,
   auto_failover    = true,
   role_models      = '{}'::jsonb,

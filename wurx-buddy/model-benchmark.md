@@ -16,7 +16,7 @@ This is the evidence behind migration `431_buddy_free_models_only.sql` and the o
   tool refuses, "best APC and why", list of APCs, and a TikTok question the search finds nothing for.
 - The performance fixture is the real shape: APCs 89 / 83 / 82, a former employee (Ali Ahmad) under
   "NOT ranked", Team Leads 62 / 61 and one withheld.
-- Keys from `.env.dev` (dev keys, free tiers). Modest volume: 4-9 s between calls, 20-45 s for Groq.
+- Keys from `.env.dev` (dev keys, free tiers). Modest volume: 4-9 s between calls, 45 s for Groq.
 - Faithfulness was scored by reading the answers against the fixtures (plus a script that lists
   numbers and capitalised names that appear nowhere in the fixtures or the prompt). Derived arithmetic
   (+$2,365.50, +23.4%) is correct and not counted.
@@ -48,10 +48,15 @@ This is the evidence behind migration `431_buddy_free_models_only.sql` and the o
 
 Rate-limit behaviour seen:
 
-- **Gemini free**: per-model, per-minute. At 4 s spacing (about 15 calls a minute, 2-3 calls per question)
-  `gemini-3.6-flash` and `gemini-3.5-flash-lite` answered 429 "exceeded your current quota"; at 9 s spacing
-  1 in 30. A Buddy question is 2-4 model calls, so a few simultaneous users can empty one model's minute:
-  the chain must spread over several Gemini models and other providers.
+- **Gemini free**: `gemini-3.6-flash` and `gemini-3.5-flash` are capped at **20 requests a day** on the free
+  tier (raw 429: "Generate content requests per day limit exceeded on Free Tier ... limit: 20 ... retry in 13h").
+  A question is 2-4 model calls, so each of them serves about 5-10 questions a day; their 429s in this
+  benchmark were that cap, not a per-minute limit. `gemini-3.5-flash-lite`, `gemini-3-flash-preview`,
+  `gemini-3.1-flash-lite` and `gemini-flash-lite-latest` were not exhausted after 25-45 calls each, but
+  `3.5-flash-lite` did return a few intermittent 429s at 4 s spacing (a per-minute limit; 1 in 30 at 9 s).
+  The wait in the message is read by `providerErrors.ts` (13 h -> class "limit"), so the model is skipped
+  for the next hour. (Measured on the DEV Gemini key; the production key is a different project but the same
+  free tier. Check its dashboard before relying on these numbers.)
 - **Groq free**: 8,000 tokens a minute per model. Buddy's full request is ~8.3k tokens, so the full prompt
   gets 413 or 429. With Buddy's compact mode (`agent/compact.ts`) it works, one question a minute or so.
   It is a fallback, not a primary, and not a per-role model.
@@ -72,13 +77,18 @@ Rate-limit behaviour seen:
 ## The order (and why)
 
 1. `gemini-3.5-flash-lite` (gemini) - fastest steady one, right tool every time.
-2. `gemini-3.6-flash` (gemini) - the most careful; its own quota bucket.
+2. `gemini-3-flash-preview` (gemini) - 3.6 s, its own quota bucket.
 3. `openai/gpt-oss-120b` (groq, compact) - a second provider.
 4. `gpt-6-luna` (OpenAI free tier) - a third provider; skipped immediately while its allowance is out.
-5. `gemini-3-flash-preview`, 6. `gemini-flash-lite-latest` (gemini) - more Gemini buckets.
+5. `gemini-flash-lite-latest` (gemini) - another Gemini bucket.
+6. `gemini-3.6-flash` (gemini) - the most careful, but only 20 requests a day: last, used while it lasts.
 
 Then the automatic safety net (`auto_failover`): remaining Gemini by rank, Groq, luna, and last NVIDIA
 (`nemotron-3-ultra` before `laguna`, because laguna added claims). NVIDIA's API-catalog keys are for
 prototyping and testing per NVIDIA's terms: never primary, never in the configured chain, and skipped
 once a turn has read people or pay data. Benchmarked-bad NVIDIA models are excluded from the net.
 No role overrides: Groq cannot carry a role, and the TL override equalled the global model.
+
+Limits of this benchmark: 13 fixed questions, small samples where a model hit its cap (for example
+`gemini-3.6-flash` has 5 answers), Groq only in compact mode, and faithfulness was scored by reading, not
+by a second judge model.

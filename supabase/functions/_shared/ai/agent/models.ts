@@ -137,7 +137,9 @@ export function resolveRoleConfig<T extends Record<string, unknown>>(cfg: T, rol
 // Gemini, then Groq, then the OpenAI free tier, and NVIDIA (trial terms) last.
 // Order from the 2026-11-02 benchmark (wurx-buddy/model-benchmark.md): fastest and
 // steadiest first; gemini-3.8-flash answered 503 / hung for 60 s, so it goes last.
-const GEMINI_ORDER = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
+// gemini-3.6-flash and gemini-3.5-flash are capped at 20 requests a DAY on the free tier
+// (429 "per day limit exceeded ... retry in 13h"), so they rank after the lite / preview models.
+const GEMINI_ORDER = ['gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
 const GROQ_ORDER = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'];
 export function netRank(t: Target): number {
   if (t.keySlot === 'gemini') {
