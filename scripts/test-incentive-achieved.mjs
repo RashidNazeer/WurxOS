@@ -170,6 +170,29 @@ const line = (o) => ({
 const plan = (o) => ({ userId: 'u1', userName: 'Ali', verified: false, payoutCleared: false, incentives: [], bonuses: [], ...o });
 const sheets = { b1: std(422, 377) };
 
+t('sheet updated for some brands, then again: second fetch fills the rest and only touches what changed', () => {
+  // b1 has its Oct achieved column; b2 does not yet (sheet ends on the Oct goal).
+  const b2Early = W.readBrandSheet([['Brand title'], ['Brand', 'Sep 26', 'Sep 1-30', 'Oct 26'],
+    ['Creators with more than three video', 40, 30, 45]]);
+  const b1v1 = std(422, 377);
+  let p = plan({ incentives: [line({ id: 'a', brandId: 'b1' }), line({ id: 'c', brandId: 'b2', brandName: 'Brand Two' })] });
+  const r1 = A.buildAchievedUpdates({ plans: [p], sheetsByBrand: { b1: b1v1, b2: b2Early }, month: '2026-10' });
+  assert.equal(r1.changes.length, 1, 'only the updated brand fills');
+  assert.equal(r1.changes[0].brandId, 'b1');
+  assert.ok(r1.skipped.some((x) => x.brandName === 'Brand Two' && /no achieved column/.test(x.reason)), 'the other brand is named with a reason');
+  p = { ...p, ...A.applyChangesToPlan(p, r1.changes) };
+  // Sheet updated again: b2 gains its achieved column, b1 re-entered with a different value.
+  const b2Late = W.readBrandSheet([['Brand title'], ['Brand', 'Sep 26', 'Sep 1-30', 'Oct 26', 'Oct 1-31'],
+    ['Creators with more than three video', 40, 30, 45, 41]]);
+  const b1v2 = W.readBrandSheet([['Brand title'], HDR,
+    ['Creators with more than three video', 40, 30, 40, 31, 40, 36]]);
+  const r2 = A.buildAchievedUpdates({ plans: [p], sheetsByBrand: { b1: b1v2, b2: b2Late }, month: '2026-10' });
+  assert.deepEqual(r2.changes.map((c) => [c.brandId, c.before, c.after]).sort(), [['b1', 32, 36], ['b2', 0, 41]]);
+  p = { ...p, ...A.applyChangesToPlan(p, r2.changes) };
+  // A third fetch with an unchanged sheet changes nothing.
+  const r3 = A.buildAchievedUpdates({ plans: [p], sheetsByBrand: { b1: b1v2, b2: b2Late }, month: '2026-10' });
+  assert.equal(r3.changes.length, 0);
+});
 t('emits a change with before/after/completion/detail', () => {
   const { changes, skipped } = A.buildAchievedUpdates({
     plans: [plan({ incentives: [line({ achievedValue: 5 })] })], sheetsByBrand: sheets, month: '2026-10',

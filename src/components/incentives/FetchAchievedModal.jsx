@@ -31,6 +31,8 @@ function fmt(optionKey, v) {
 
 const pill = (bg, color) => ({ padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700, background: bg, color, whiteSpace: 'nowrap' });
 
+const sharedSource = () => `the shared sheet, fetched at ${new Date().toLocaleTimeString()}`;
+
 export default function FetchAchievedModal({ users, month, monthLabel, onApplied, onClose }) {
   const [plans, setPlans] = useState(null);
   const [sheets, setSheets] = useState(null);     // brandId -> readBrandSheet() result | { missing: true }
@@ -77,7 +79,7 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
       try { saved = await getIncentiveWorkbookUrl(); } catch { /* fall back to upload */ }
       if (!mounted.current) return;
       setLink(saved);
-      if (saved?.url) run(() => fetchWorkbookBuffer(saved.url), 'the shared sheet, fetched just now');
+      if (saved?.url) run(() => fetchWorkbookBuffer(saved.url), sharedSource());
       else { setLoading(false); setError('No workbook link is saved yet. Save one from an APC plan\'s workbook picker, or upload the file below.'); }
     })();
     return () => { mounted.current = false; };
@@ -184,7 +186,7 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               {link?.url && (
                 <button type="button" className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }} disabled={loading}
-                  onClick={() => run(() => fetchWorkbookBuffer(link.url), 'the shared sheet, fetched just now')}>
+                  onClick={() => run(() => fetchWorkbookBuffer(link.url), sharedSource())}>
                   <i className="bi bi-arrow-clockwise me-1" /> Reload
                 </button>
               )}
@@ -302,6 +304,12 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
               {results.filter((r) => r.ok).map((r) => (
                 <div key={r.name} style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.name}: {r.n} line{r.n === 1 ? '' : 's'} updated</div>
               ))}
+              <div>
+                <button type="button" className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }}
+                  onClick={() => { setPhase('preview'); setResults([]); if (link?.url) run(() => fetchWorkbookBuffer(link.url), sharedSource()); }}>
+                  <i className="bi bi-arrow-clockwise me-1" /> Read the workbook again
+                </button>
+              </div>
               {failed.map((r) => (
                 <div key={r.name} style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', background: 'var(--danger-soft, rgba(220,38,38,.1))', color: 'var(--danger, #dc2626)', fontSize: 12.5 }}>
                   <strong>{r.name}</strong> was not saved: {r.error}
