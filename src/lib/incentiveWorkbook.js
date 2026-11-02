@@ -79,6 +79,10 @@ export const INCENTIVE_OPTIONS = [
 export const OPTION_BY_KEY = Object.fromEntries(INCENTIVE_OPTIONS.map((o) => [o.key, o]));
 export const MAX_SELECTIONS_PER_APC = 5;
 
+// The PKR amount a line gets when it is added from the workbook. The OL can still change it
+// on the plan; a line that already exists keeps whatever amount it has.
+export const DEFAULT_LINE_AMOUNT = { incentives: 5000, bonuses: 10000 };
+
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december'];
 
@@ -344,7 +348,7 @@ export function buildSelectionChanges({
     add[opt.section].push({
       id: makeId(),
       text: opt.label,
-      amount: '',
+      amount: String(DEFAULT_LINE_AMOUNT[opt.section]),
       suffix: opt.unit === 'ratio' ? '%' : '',
       targetValue,
       achievedValue: 0,
