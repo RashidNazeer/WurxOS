@@ -17,7 +17,7 @@ Boss and OL. Both have the same controls. A Boss or OL can't win an award themse
 2. Under **Winner**, pick someone from the list. Each person is shown with their composite score, or "not rated".
    - If you haven't picked yet, a button can suggest the **Top scorer this month**. It's only a suggestion.
    - Your choice is saved as soon as you pick.
-3. Enter the **Reward (PKR)**. It saves when you click out of the box.
+3. The **Reward (PKR)** starts at the standard amount for that award: PKR 10,000 for APC of the Month and PKR 15,000 for TL of the Month. Change it if needed; it saves when you click out of the box.
 4. Write the **Message to the winner** (one line, 100 characters at most) and click **Save message**. Either the Boss or an OL can write it. The winner sees it without a name attached.
 5. Click **Preview what the winner sees** to check the celebration.
 6. Click **Announce**. The button stays disabled until there's a winner and a message.

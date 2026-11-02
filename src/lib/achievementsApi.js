@@ -50,7 +50,8 @@ export async function saveAchievement({ typeKey, month, winnerId, reward }) {
   const { data, error } = await supabase.rpc('achievement_upsert', {
     p_type_key: typeKey, p_month: month,
     p_winner_id: winnerId || null,
-    p_reward: Number(reward) || 0,
+    // Left empty -> null -> the award's standard reward (mig 433); an explicit 0 stays 0.
+    p_reward: reward === '' || reward == null ? null : Number(reward) || 0,
   });
   if (error) throw new Error(error.message);
   return data;
