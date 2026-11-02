@@ -30,7 +30,7 @@ import SaveStatus from './SaveStatus';
 import PasteParsePanel from './PasteParsePanel';
 import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
 import { loadColumns } from '../../lib/gmvMaxLayout';
-import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
+import { parseGmvMaxText, explainGmvMaxPaste, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionHeader title it belongs to.
@@ -1198,6 +1198,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             noun="campaign"
             accent="var(--danger)"
             parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+            explain={explainGmvMaxPaste}
             onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
             hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this report period</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
           />
@@ -1236,6 +1237,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             noun="campaign"
             accent="var(--danger)"
             parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+            explain={explainGmvMaxPaste}
             onApply={rows => setData(d => ({ ...d, gmvMaxMtd: mergeGmvMaxRows(d.gmvMaxMtd, rows) }))}
             hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the box above.</>}
           />

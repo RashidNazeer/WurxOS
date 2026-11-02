@@ -28,7 +28,7 @@ import SaveStatus from './SaveStatus';
 import PasteParsePanel from './PasteParsePanel';
 import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
 import { loadColumns } from '../../lib/gmvMaxLayout';
-import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
+import { parseGmvMaxText, explainGmvMaxPaste, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionCard title it belongs to.
@@ -1162,6 +1162,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           noun="campaign"
           accent="var(--danger)"
           parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+          explain={explainGmvMaxPaste}
           onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
           hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this month</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV.</>}
         />

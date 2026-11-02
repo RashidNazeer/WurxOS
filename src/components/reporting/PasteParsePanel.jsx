@@ -15,7 +15,7 @@ import { useState } from 'react';
  *   hint      – placeholder / helper shown inside the textarea area
  *   accent    – accent colour for the header (defaults to the theme accent)
  */
-export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, accent = 'var(--accent)' }) {
+export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, accent = 'var(--accent)', explain }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [status, setStatus] = useState(null); // { kind:'success'|'error', msg }
@@ -26,12 +26,14 @@ export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, ac
     let rows = [];
     try {
       rows = parse(text) || [];
-    } catch {
-      setStatus({ kind: 'error', msg: `Couldn't read that — check the pasted format or enter ${noun}s manually.` });
+    } catch (err) {
+      setStatus({ kind: 'error', msg: `Couldn't read that (${err?.message || 'unexpected error'}) — check the pasted format or enter ${noun}s manually.` });
       return;
     }
     if (!rows.length) {
-      setStatus({ kind: 'error', msg: `No ${noun}s detected. Make sure you copied the whole table, or enter them manually.` });
+      let why = '';
+      try { why = explain ? explain(text) : ''; } catch { /* the generic message below still applies */ }
+      setStatus({ kind: 'error', msg: why || `No ${noun}s detected. Make sure you copied the whole table, or enter them manually.` });
       return;
     }
     onApply(rows);

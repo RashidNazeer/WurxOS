@@ -31,7 +31,7 @@ import PasteParsePanel from './PasteParsePanel';
 import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
 import { loadColumns } from '../../lib/gmvMaxLayout';
 import { useSectionPresets } from './SectionPresetBar';
-import { parseTopVideosText, parseTopCreatorsText, parseGmvMaxText } from '../../utils/reportPasteParsers';
+import { parseTopVideosText, parseTopCreatorsText, parseGmvMaxText, explainGmvMaxPaste } from '../../utils/reportPasteParsers';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
 import '../../styles/reportImmersive.css';
@@ -1781,6 +1781,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           noun="campaign"
           accent="var(--danger)"
           parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+          explain={explainGmvMaxPaste}
           onApply={rows => setData(d => {
             const isReal = g => (g.campaign && g.campaign.trim())
               || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
@@ -1818,6 +1819,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           noun="campaign"
           accent="var(--danger)"
           parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+          explain={explainGmvMaxPaste}
           onApply={rows => setData(d => {
             const isReal = g => (g.campaign && g.campaign.trim())
               || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());

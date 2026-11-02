@@ -211,12 +211,24 @@ export function parseTopCreatorsText(raw) {
   return creators;
 }
 
-const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;   // 2026-02-13 06:58:53
+// The campaign's start-time line is the ONE anchor the whole parser hangs on: every
+// campaign block is cut at it, so when TikTok shows it any other way the paste
+// finds zero campaigns no matter what the column layout says. TikTok has used
+// "2026-02-13 06:58:53"; the other shapes a UI or locale change could produce are
+// accepted too (no seconds, slashes, US order, 12-hour clock, month names, a
+// "(UTC-7)" suffix). A bare time or a bare date is NOT enough.
+const CLOCK = String.raw`\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AP]\.?M\.?)?(?:\s*\(?(?:UTC|GMT)\s?[+-]?\d{1,2}(?::?\d{2})?\)?)?`;
+const DATETIME_RE = new RegExp([
+  String.raw`^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}(?:[ T]|,\s*)${CLOCK}$`,            // 2026-02-13 06:58[:53]
+  String.raw`^\d{1,2}[-/.]\d{1,2}[-/.]\d{4},?\s+${CLOCK}$`,                    // 02/13/2026 6:58 AM
+  String.raw`^[A-Za-z]{3,9}\.? \d{1,2},? \d{4},?\s+${CLOCK}$`,                  // Feb 13, 2026, 6:58 AM
+  String.raw`^\d{1,2} [A-Za-z]{3,9}\.? \d{4},?\s+${CLOCK}$`,                    // 13 Feb 2026 06:58
+].join('|'), 'i');
 // A money cell: "160.00 USD", "3,197.20 USD", "826.71 GBP", "$223.90".
 // It must carry a currency marker — a bare number is Orders / ROI / Target ROI,
 // and the tail logic depends on telling those apart. Matching only "USD" meant
 // non-USD brands parsed nothing at all.
-const USD_VALUE_RE = /^(?:[$£€₨]\s*)?[\d,]+(?:\.\d+)?\s*(?:USD|GBP|EUR|AUD|CAD|SGD|AED|PKR|INR|JPY)$|^[$£€₨]\s*[\d,]+(?:\.\d+)?$/i;
+const USD_VALUE_RE = /^(?:[$£€₨]\s*)?[\d,]+(?:\.\d+)?\s*(?:USD|GBP|EUR|AUD|CAD|SGD|AED|PKR|INR|JPY)$|^(?:USD|GBP|EUR|AUD|CAD|SGD|AED|PKR|INR|JPY)\s*[$£€₨]?\s*[\d,]+(?:\.\d+)?$|^[$£€₨]\s*[\d,]+(?:\.\d+)?$/i;
 const PURE_INT_RE = /^\d{1,3}(?:,\d{3})*$|^\d+$/;                 // 61, 1,234
 const PURE_DECIMAL_RE = /^\d+\.\d+$/;                             // 0.77, 1.50
 
@@ -323,6 +335,24 @@ function mapByLayout(lines, from, to, cols, out) {
     v++;
   }
   return hits;
+}
+
+/**
+ * Why a GMV Max paste produced no campaigns, in words an APC can act on. Called
+ * only when the parse came back empty. Names what was (not) found instead of the
+ * generic "no campaigns detected", so a changed TikTok format reports itself.
+ */
+export function explainGmvMaxPaste(raw) {
+  const lines = String(raw || '').replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return '';
+  if (!lines.some(l => DATETIME_RE.test(l))) {
+    const dateLike = lines.filter(l => /\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4}|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2}/i.test(l)).slice(0, 3);
+    return `Read ${lines.length} lines but found no campaign start-time line (a date and time such as "2026-02-13 06:58:53"), which is how each campaign is told apart.`
+      + (dateLike.length
+        ? ` The nearest date-like lines were: ${dateLike.map(l => `"${l.slice(0, 40)}"`).join(', ')}. TikTok may have changed how it writes the start time — send this message to the developer.`
+        : ' Copy the whole Campaign list including the Schedule column and paste it again.');
+  }
+  return 'Found the start-time lines but could not tell where each campaign name begins. Copy the table from its header down to the last campaign row, then paste again.';
 }
 
 export function parseGmvMaxText(raw, opts) {
