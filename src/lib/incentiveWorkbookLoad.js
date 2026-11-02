@@ -8,7 +8,9 @@ export const canon = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^
 /** Download the published sheet. Throws an Error whose message is fit to show. */
 export async function fetchWorkbookBuffer(url) {
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    // Google's published sheet sits behind a cache; a fresh query string makes each click ask again.
+    const fresh = /^https:\/\/docs\.google\.com\//i.test(url) ? `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}` : url;
+    const res = await fetch(fresh, { cache: 'no-store' });
     if (!res.ok) throw new Error(`The sheet could not be fetched (HTTP ${res.status}). Check it is still published to the web.`);
     const buf = await res.arrayBuffer();
     // An unpublished or private sheet answers 200 with a Google sign-in PAGE; an xlsx is a zip ("PK").

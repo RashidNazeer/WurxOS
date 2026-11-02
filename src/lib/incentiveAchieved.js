@@ -79,7 +79,8 @@ function achievedColumn(sheet, monthKey) {
  * Returns { value, unit, detail } or { unavailable: '<why>' }.
  */
 export function getAchieved(sheet, optionKey, monthKey) {
-  if (!sheet || sheet.missing || !sheet.ok) return { unavailable: sheet?.reason || 'sheet could not be read' };
+  if (!sheet || sheet.missing) return { unavailable: 'this brand has no tab in the workbook (the tab name must match the brand name in WurxOS exactly)' };
+  if (!sheet.ok) return { unavailable: sheet.reason || 'this brand\'s tab could not be read' };
   const opt = OPTION_BY_KEY[optionKey];
   if (!opt) return { unavailable: `unknown option "${optionKey}"` };
 
@@ -129,13 +130,26 @@ const DERIVED_SOURCES = {
   ol_brands: 'achieved is derived from the OL brands roll-up',
 };
 
+// A line made by hand carries no workbook marker. When its text is exactly an
+// option's name and it is tied to a brand, that is enough to know which row to read.
+const OPTION_BY_LABEL = Object.fromEntries(Object.values(OPTION_BY_KEY).map((o) => [norm(o.label), o.key]));
+export const optionForLine = (item) =>
+  item?.wbOption || (item?.brandId && !item.source ? OPTION_BY_LABEL[norm(item.text)] || null : null);
+
 /**
  * Work out which plan lines the workbook can fill in, without touching anything.
  * `autoComplete` is injectable so a caller may pass the real one.
+ *
+ * GMV Max lines derive their figure from the brand's monthly GMV, so they are never
+ * written line by line. Pass `gmvMaxBefore` (brandId -> current gmv_achieved) and
+ * `monthClosed` and, for a CLOSED month, the sheet's figure comes back in
+ * `metricUpdates` to be written to that one source. While the month is open the
+ * APC's daily clock-in keeps overwriting it, so those lines are skipped.
  */
-export function buildAchievedUpdates({ plans, sheetsByBrand = {}, month, autoComplete = autoCompleteLike }) {
+export function buildAchievedUpdates({ plans, sheetsByBrand = {}, month, autoComplete = autoCompleteLike, gmvMaxBefore = null, monthClosed = false }) {
   const changes = [];
   const skipped = [];
+  const metrics = new Map();
 
   for (const plan of plans || []) {
     if (plan.payoutCleared === true) {
@@ -144,18 +158,29 @@ export function buildAchievedUpdates({ plans, sheetsByBrand = {}, month, autoCom
     }
     for (const section of ['incentives', 'bonuses']) {
       for (const item of plan[section] || []) {
-        if (!item || !item.wbOption || !item.brandId) continue;
-        const label = item.text || OPTION_BY_KEY[item.wbOption]?.label || item.wbOption;
+        if (!item || !item.brandId) continue;
+        const optionKey = item.source === 'gmv_max' ? 'gmv_max' : optionForLine(item);
+        if (!optionKey) continue;
+        const label = item.text || OPTION_BY_KEY[optionKey]?.label || optionKey;
         const skip = (reason) => skipped.push({ userName: plan.userName, brandName: item.brandName, label, reason });
 
+        if (item.source === 'gmv_max' && gmvMaxBefore) {
+          if (!monthClosed) { skip("this month is still open, so the APC's daily clock-in figure feeds this line until the month closes"); continue; }
+          const got = getAchieved(sheetsByBrand[item.brandId], 'gmv_max', month);
+          if (got.unavailable) { skip(got.unavailable); continue; }
+          const was = gmvMaxBefore[item.brandId];
+          if (Number(was) === got.value) continue;
+          const m = metrics.get(item.brandId)
+            || { brandId: item.brandId, brandName: item.brandName, before: was ?? null, after: got.value, detail: got.detail, lines: [] };
+          m.lines.push(`${plan.userName}: ${label}`);
+          metrics.set(item.brandId, m);
+          continue;
+        }
         if (item.source) {
           skip(DERIVED_SOURCES[item.source] || `line is auto-filled (${item.source})`);
           continue;
         }
-        const sheet = sheetsByBrand[item.brandId];
-        if (!sheet || sheet.missing) { skip('no sheet for this brand in the workbook'); continue; }
-
-        const res = getAchieved(sheet, item.wbOption, month);
+        const res = getAchieved(sheetsByBrand[item.brandId], optionKey, month);
         if (res.unavailable) { skip(res.unavailable); continue; }
 
         const before = Number(item.achievedValue) || 0;
@@ -168,7 +193,7 @@ export function buildAchievedUpdates({ plans, sheetsByBrand = {}, month, autoCom
           lineId: item.id,
           brandId: item.brandId,
           brandName: item.brandName,
-          optionKey: item.wbOption,
+          optionKey,
           label,
           before,
           after,
@@ -180,7 +205,7 @@ export function buildAchievedUpdates({ plans, sheetsByBrand = {}, month, autoCom
       }
     }
   }
-  return { changes, skipped };
+  return { changes, skipped, metricUpdates: [...metrics.values()] };
 }
 
 /**
