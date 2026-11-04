@@ -26,3 +26,7 @@ WurxOS as a read-only connector for claude.ai. Boss and OL roles ONLY (`_shared/
 - `/oauth/consent` redirects any other role to the dashboard, as for an unknown URL; its code chunk is never requested.
 - The `mcp` endpoint answers 404 (not 403) to a signed-in account that is not an active Boss or OL, so it looks nonexistent.
 - Unavoidable: an unauthenticated request gets 401 and the OAuth discovery document (Claude needs both to start sign-in), and the compiled app files are static assets.
+
+## OL sees what the app shows an OL (audit 2026-11-04)
+The OL runs on their own login, and `tools/roles.ts` `OL_SEES` narrows what RLS would allow to the app's pages: Performance = TL/PCTL/APC/IPC (no other OLs, ads managers, developers); Incentives = active apc/ipc/tl/ol/ads_manager (no PCTLs, no former staff); directory email/responsibilities = tl/pctl/ol/apc/ipc; no employment type or start date of others; salary = own only. An OL with no client of their own is refused, never served by the service client. The Boss is unrestricted.
+Still to verify once the OAuth Server is on: that connector tokens carry the `authenticated` role so RLS applies (test as a real OL).

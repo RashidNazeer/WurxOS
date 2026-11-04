@@ -254,7 +254,9 @@ export async function runDataTool(admin: Db, ctx: ToolCtx, name: string, args: a
   // Non-Boss: the caller's JWT client, so RLS decides. Without one, people &
   // pay fail closed; brand/report tools fall back to the service client with
   // the can_view_brand checks in acl.ts (e.g. a future as-user relay).
-  const db = boss ? admin : ctx.userClient ?? (PEOPLE.has(name) ? null : admin);
+  // An OL ALWAYS reads as themselves: no client of their own means refuse, never the service client
+  // (the Claude connector relies on this).
+  const db = boss ? admin : ctx.userClient ?? (PEOPLE.has(name) || ctx.role === 'ol' ? null : admin);
   if (!db) return refuse();
   try {
     const r = await impl(db, ctx, args ?? {}, admin);
