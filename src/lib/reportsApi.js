@@ -1217,11 +1217,15 @@ async function _saveReportV1({ type, brandId, weekInfo, data, uid, status = 'dra
     // but no longer has read access to). That used to surface as
     // "cannot coerce result to single JSON object" and crash the
     // Save / Submit Draft action even though the write succeeded.
-    const { error } = await supabase
+    // RLS refuses an UPDATE by matching 0 rows with no error; without the row
+    // check the form reported "saved" while nothing was written (Mineral Ice, 2026-11-04).
+    const { data: updated, error } = await supabase
       .from('reports')
       .update(payload)
-      .eq('id', existingId);
+      .eq('id', existingId)
+      .select('id');
     if (error) throw new Error(error.message);
+    if (!updated?.length) throw new Error('Not saved: you do not have permission to edit this report. Your changes were NOT stored - tell your TL.');
     return existingId;
   }
   payload.author_id = uid;
