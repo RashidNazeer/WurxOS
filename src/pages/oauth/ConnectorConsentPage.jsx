@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+
+// Same rule as the `mcp` function (supabase/functions/_shared/mcp/access.ts), which is the real gate:
+// it refuses every other role on every request. This only spares them a confusing Allow button.
+const CONNECTOR_ROLES = ['boss', 'ol'];
 
 // Consent screen for "Connect WurxOS to Claude". Supabase Auth's OAuth server sends the person here
 // (Authentication → OAuth Server → Authorization Path = /oauth/consent) with ?authorization_id=…;
@@ -15,12 +20,15 @@ const card = {
 
 export default function ConnectorConsentPage() {
   const [params] = useSearchParams();
+  const { profile, loading } = useAuth();
+  const allowed = profile?.is_active === true && CONNECTOR_ROLES.includes(profile?.role);
   const authorizationId = params.get('authorization_id') || '';
   const [details, setDetails] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (loading || !allowed) return undefined;
     if (!authorizationId) { setError('This page was opened without an authorization request. Start the connection from Claude.'); return; }
     let live = true;
     supabase.auth.oauth.getAuthorizationDetails(authorizationId).then(({ data, error: e }) => {
@@ -31,9 +39,10 @@ export default function ConnectorConsentPage() {
       setDetails(data);
     });
     return () => { live = false; };
-  }, [authorizationId]);
+  }, [authorizationId, loading, allowed]);
 
   async function decide(approve) {
+    if (!allowed) return;
     setBusy(true);
     const call = approve ? supabase.auth.oauth.approveAuthorization : supabase.auth.oauth.denyAuthorization;
     const { data, error: e } = await call.call(supabase.auth.oauth, authorizationId);
@@ -45,7 +54,13 @@ export default function ConnectorConsentPage() {
     <div style={wrap}>
       <div style={card}>
         <h1 style={{ fontSize: 20, margin: '0 0 8px', color: 'var(--text-primary)' }}>Connect WurxOS to Claude</h1>
-        {error ? (
+        {loading ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</p>
+        ) : !allowed ? (
+          <p style={{ color: 'var(--danger)', fontSize: 14 }}>
+            The Claude connector is only available to the Boss and Operations Leads. Your account can't connect it.
+          </p>
+        ) : error ? (
           <p style={{ color: 'var(--danger)', fontSize: 14 }}>{error}</p>
         ) : !details ? (
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</p>
