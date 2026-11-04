@@ -21,3 +21,8 @@ WurxOS as a read-only connector for claude.ai. Boss and OL roles ONLY (`_shared/
 - Read-only by design. Writes need a confirmation step and a separate review.
 - Audit: `select * from mcp_call_log order by id desc` (Boss). Nothing prunes it yet.
 - To let more roles in, edit `MCP_ROLES`; to change the limit, `MCP_CALLS_PER_MINUTE`.
+
+## Hidden from everyone else
+- `/oauth/consent` redirects any other role to the dashboard, as for an unknown URL; its code chunk is never requested.
+- The `mcp` endpoint answers 404 (not 403) to a signed-in account that is not an active Boss or OL, so it looks nonexistent.
+- Unavoidable: an unauthenticated request gets 401 and the OAuth discovery document (Claude needs both to start sign-in), and the compiled app files are static assets.

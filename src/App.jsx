@@ -176,6 +176,15 @@ function DashboardRouter() {
   return <TodayRouter profile={profile} />;
 }
 
+// The Claude connector's consent screen exists ONLY for the Boss and OLs. Anyone else is sent to the
+// dashboard exactly as for an unknown URL (no message, and the page's code is never requested).
+function ConnectorRoute() {
+  const { profile, loading } = useAuth();
+  if (loading || !profile) return <PageFallback />;
+  if (profile.is_active !== true || !['boss', 'ol'].includes(profile.role)) return <Navigate to="/dashboard" replace />;
+  return <Suspense fallback={<PageFallback />}><ConnectorConsentPage /></Suspense>;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -230,7 +239,7 @@ export default function App() {
             {/* "Connect WurxOS to Claude" consent (Supabase OAuth server). Signed-in only; sits outside the shell. */}
             <Route
               path="/oauth/consent"
-              element={<ProtectedRoute><Suspense fallback={<PageFallback />}><ConnectorConsentPage /></Suspense></ProtectedRoute>}
+              element={<ProtectedRoute><ConnectorRoute /></ProtectedRoute>}
             />
 
             {/* Protected shell — NotificationsProvider needs an authenticated user.
