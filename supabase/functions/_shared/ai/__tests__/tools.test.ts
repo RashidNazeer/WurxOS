@@ -658,7 +658,11 @@ test('directory: email, responsibilities and employment type for Boss/OL only', 
     assert.ok(!/Email|Secret duty|Employment|full-time/.test(t), role);
     assert.match(t, /^Apc One \(APC\)\n- Role: Affiliate Program Coordinator \(APC\)\n- Reports to: Tl One \(Team Lead — Affiliate \(TL\)\)\n- Start date: 2026-01-01/);
   }
-  for (const role of ['ol', 'boss']) assert.match((await ask(role)).text, /- Email: u-apc@x\.test[\s\S]*- Employment: full-time[\s\S]*- Responsibilities: Secret duty/);
+  assert.match((await ask('boss')).text, /- Email: u-apc@x\.test[\s\S]*- Employment: full-time[\s\S]*- Responsibilities: Secret duty/);
+  // An OL: the directory's email and responsibilities for the roles it lists, but no employment type and no start date.
+  const olText = (await ask('ol')).text;
+  assert.match(olText, /- Email: u-apc@x\.test[\s\S]*- Responsibilities: Secret duty/);
+  assert.ok(!/Employment|full-time|Start date/.test(olText));
   const emp = await runDataTool(fakeDb({}), { userId: 'u-x', role: 'apc', userClient: fakeDb({ profiles: rows }) }, 'get_employees', {});
   assert.ok(!emp.text.includes('full-time'));
 });
@@ -737,5 +741,41 @@ test('tool catalog: every definition has an implementation and a JSON schema', (
   for (const d of TOOL_DEFS) {
     assert.equal((d.parameters as any).type, 'object', d.name);
     assert.ok(d.description.length > 20, d.name);
+  }
+});
+
+// ------------------------------------------------------------------ OL parity with the app (Claude connector)
+const OL_PEOPLE = [
+  ...PEOPLE_ROWS,
+  { id: 'u-ol2', display_name: 'Ol Two', role: 'ol', reports_to: null, deleted_at: null, is_active: true },
+  { id: 'u-ads', display_name: 'Ads Person', role: 'ads_manager', reports_to: null, deleted_at: null, is_active: true },
+  { id: 'u-pc', display_name: 'Pc Lead', role: 'pctl', reports_to: null, deleted_at: null, is_active: true },
+  { id: 'u-gone', display_name: 'Gone Apc', role: 'apc', reports_to: null, deleted_at: '2026-10-12T00:00:00Z', is_active: false },
+];
+
+test('OL performance: only the roles the Performance page rates; other OLs, ads managers and developers are refused', async () => {
+  const ol = { userId: 'u-ol', role: 'ol', userClient: fakeDb({ profiles: OL_PEOPLE, performance_ratings: [], performance_flags: [], performance_warnings: [], performance_month_snapshots: [] }) };
+  assert.equal((await runDataTool(fakeDb({}), ol, 'get_performance', { person_name: 'Ol Two', month: '2026-10' })).text, NOT_YOURS);
+  assert.equal((await runDataTool(fakeDb({}), ol, 'get_performance', { person_name: 'Ads Person', month: '2026-10' })).text, NOT_YOURS);
+  assert.equal((await runDataTool(fakeDb({}), ol, 'get_performance', { role: 'ol', month: '2026-10' })).text, NOT_YOURS);
+  assert.equal((await runDataTool(fakeDb({}), ol, 'get_performance', { role: 'ads_manager', month: '2026-10' })).text, NOT_YOURS);
+  assert.notEqual((await runDataTool(fakeDb({}), ol, 'get_performance', { role: 'tl', month: '2026-10' })).text, NOT_YOURS);
+});
+
+test('OL incentives: active apc/ipc/tl/ol/ads_manager only (no PCTLs, no former employees)', async () => {
+  const inc = (id: string) => ({ user_id: id, month: '2026-10', basic_salary: 1, incentives: [{ text: 'Goal', amount: 100, completed: true }], bonuses: [], verified: true, payout_cleared: true });
+  const ol = { userId: 'u-ol', role: 'ol', userClient: fakeDb({ profiles: OL_PEOPLE, incentives: ['u-apc', 'u-tl', 'u-pc', 'u-gone', 'u-ads', 'u-ol2'].map(inc) }) };
+  const all = (await runDataTool(fakeDb({}), ol, 'get_incentives', { month: '2026-10' })).text;
+  assert.match(all, /\(4 record\(s\)\)/);
+  for (const n of ['Apc One', 'Tl One', 'Ads Person', 'Ol Two']) assert.ok(all.includes(n), n);
+  assert.ok(!all.includes('Pc Lead') && !all.includes('Gone Apc'));
+  assert.equal((await runDataTool(fakeDb({}), ol, 'get_incentives', { person_name: 'Pc Lead', month: '2026-10' })).text, NOT_YOURS);
+});
+
+test('OL fails closed: with no client of their own nothing is read through the service client', async () => {
+  const admin = fakeDb({ brands: BRANDS, reports: [], profiles: OL_PEOPLE, agenda_tasks: [] });
+  const ol = { userId: 'u-ol', role: 'ol' };
+  for (const tool of ['list_brands', 'get_reports', 'get_gmv_max', 'get_agenda_tasks', 'brand_overview', 'get_employees', 'get_salary']) {
+    assert.equal((await runDataTool(admin, ol as any, tool, { brand: 'x' })).text, NOT_YOURS, tool);
   }
 });

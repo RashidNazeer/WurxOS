@@ -13,6 +13,7 @@
 
 import type { Db, ToolCtx, ToolSource } from './types.ts';
 import { hms, karachiMonthNow, money, monthToRange, pktTime, roleLabelOf } from './v1format.ts';
+import { isOlViewer, olMay } from './roles.ts';
 import { FORMER_PHRASE, formerMatches, isFormer, leftOn, loadPeople, noActiveMatch, PARTIAL_VIEW, roleCode, sawAll, who } from './who.ts';
 
 export type Out = { text: string; source: ToolSource };
@@ -217,7 +218,7 @@ export async function findPerson(s: Scope, args: any): Promise<Out> {
   if (!people.length && former.length === 1) {
     const f = former[0];
     return out([who(f), `- Role: ${roleLabelOf(f.role)}`, '- Status: FORMER EMPLOYEE, no longer works here' + (leftOn(f) ? `; left ${leftOn(f)}` : ''),
-      f.start_date ? `- Start date: ${f.start_date}` : null, '(A former employee has no current salary, incentives, performance, attendance or leave.)'].filter(Boolean).join('\n'), { ...src, ids: [f.id] });
+      f.start_date && (s.boss || !isOlViewer(s.ctx.role)) ? `- Start date: ${f.start_date}` : null, '(A former employee has no current salary, incentives, performance, attendance or leave.)'].filter(Boolean).join('\n'), { ...src, ids: [f.id] });
   }
   if (!people.length) return out(former.length ? await noActiveMatch(db, q) : `No active employee matches "${q}".`, src);
   if (people.length > 1) return out(`Multiple people match "${q}":\n` + people.map((p: any) => `- ${who(p)} — ${roleLabelOf(p.role)}`).join('\n') + formerNote + '\nAsk which one.', { ...src, ids: people.map((p: any) => p.id) });
@@ -229,15 +230,19 @@ export async function findPerson(s: Scope, args: any): Promise<Out> {
   }
   // Lead decision: email and responsibilities for the Boss and OLs only, although
   // profiles RLS lets every employee read them (conservative; Owner may widen).
-  const full = s.boss || String(s.ctx.role).toLowerCase() === 'ol';
+  // An OL sees email and responsibilities only for the roles the app's directory lists, and neither
+  // employment type nor start date of anyone else (no OL page shows them).
+  const ol = !s.boss && isOlViewer(s.ctx.role);
+  const self = p.id === s.ctx.userId;
+  const full = s.boss || (ol && olMay('directory', p.role));
   const resp = full && Array.isArray(p.responsibilities) && p.responsibilities.length ? p.responsibilities.join(', ') : '';
   const lines = [
     `${who(p)}`,
     `- Role: ${roleLabelOf(p.role)}`,
     full && p.email ? `- Email: ${p.email}` : null,
     mgr ? `- Reports to: ${mgr}` : (p.role === 'boss' ? null : '- Reports to: (not set)'),
-    full && p.employment_type ? `- Employment: ${p.employment_type}` : null,
-    p.start_date ? `- Start date: ${p.start_date}` : null,
+    (s.boss || (ol && self)) && p.employment_type ? `- Employment: ${p.employment_type}` : null,
+    p.start_date && (!ol || self) ? `- Start date: ${p.start_date}` : null,
     resp ? `- Responsibilities: ${resp}` : null,
     '- Status: active (currently employed)',
     '(For this person\'s salary, incentives, performance, attendance or leave, call the matching tool.)',
@@ -249,7 +254,7 @@ export async function getEmployees(s: Scope, args: any): Promise<Out> {
   const db = s.db;
   const src: ToolSource = { table: 'profiles' };
   let q = db.from('profiles')
-    .select('display_name, role, reports_to, employment_type, start_date, is_active, deleted_at')
+    .select('id, display_name, role, reports_to, employment_type, start_date, is_active, deleted_at')
     .order('role', { ascending: true }).order('display_name', { ascending: true }).limit(300);
   if (!args?.include_inactive) q = q.is('deleted_at', null).eq('is_active', true);
   if (args?.role) q = q.eq('role', String(args.role));
@@ -261,10 +266,10 @@ export async function getEmployees(s: Scope, args: any): Promise<Out> {
     ? await db.from('profiles').select('id, display_name').in('id', mgrIds)
     : { data: [] };
   const mgrOf = new Map((mgrs || []).map((m: any) => [m.id, m.display_name]));
-  const full = s.boss || String(s.ctx.role).toLowerCase() === 'ol';   // see findPerson
+  const ol = !s.boss && isOlViewer(s.ctx.role);   // see findPerson: an OL gets neither employment type nor start dates of others
   const byRole = new Map<string, string[]>();
   for (const e of emps) {
-    const line = `  - ${e.display_name}${full && e.employment_type ? ` · ${e.employment_type}` : ''}${e.reports_to && mgrOf.get(e.reports_to) ? ` · reports to ${mgrOf.get(e.reports_to)}` : ''}${e.start_date ? ` · since ${e.start_date}` : ''}${isFormer(e) ? ` · FORMER EMPLOYEE (${leftOn(e) ? `left ${leftOn(e)}` : 'deactivated'})` : ''}`;
+    const line = `  - ${e.display_name}${s.boss && e.employment_type ? ` · ${e.employment_type}` : ''}${e.reports_to && mgrOf.get(e.reports_to) ? ` · reports to ${mgrOf.get(e.reports_to)}` : ''}${e.start_date && (!ol || e.id === s.ctx.userId) ? ` · since ${e.start_date}` : ''}${isFormer(e) ? ` · FORMER EMPLOYEE (${leftOn(e) ? `left ${leftOn(e)}` : 'deactivated'})` : ''}`;
     const k = roleLabelOf(e.role);
     (byRole.get(k) || byRole.set(k, []).get(k)!).push(line);
   }
@@ -306,7 +311,14 @@ export async function getIncentives(s: Scope, args: any): Promise<Out> {
   const ids = [...new Set(orows.map((r: any) => r.user_id))];
   const people = await loadPeople(db, ids as string[]);
   const nameOf = (id: string) => people.get(id)?.display_name || 'Unknown';
-  const sorted = orows.slice().sort((a: any, b: any) => String(nameOf(a.user_id)).localeCompare(String(nameOf(b.user_id))));
+  // An OL's Incentives page lists only ACTIVE apc / ipc / tl / ol / ads_manager (OLIncentivesPage.jsx):
+  // no PCTLs, no former employees. Their own row is always theirs.
+  const olView = !s.boss && isOlViewer(s.ctx.role);
+  const listed = olView
+    ? orows.filter((r: any) => r.user_id === s.ctx.userId || (people.has(r.user_id) && !isFormer(people.get(r.user_id)) && olMay('incentives', people.get(r.user_id).role)))
+    : orows;
+  if (!listed.length) return out(aboutSomeoneElse(s, userIds) ? NOT_YOURS : `No incentive records for ${label} in ${month || '(no data)'}.`, src);
+  const sorted = listed.slice().sort((a: any, b: any) => String(nameOf(a.user_id)).localeCompare(String(nameOf(b.user_id))));
   const show = (r: any) => (s.boss || r.user_id === s.ctx.userId);
   // One person: the goal-by-goal detail. Everyone: one compact line each (the full detail of 13+
   // people overran the tool's size cap and silently cut people off the end).
@@ -314,11 +326,11 @@ export async function getIncentives(s: Scope, args: any): Promise<Out> {
   const current = sorted.filter((r: any) => !isFormer(people.get(r.user_id)));
   const former = sorted.filter((r: any) => isFormer(people.get(r.user_id)));
   const sep = userIds ? '\n\n' : '\n';
-  let text = `Incentives for ${month} (${orows.length} record(s)${former.length ? `: ${current.length} current employees, ${former.length} ${FORMER_PHRASE}s listed after them` : ''}):\n\n` + current.map(render).join(sep);
+  let text = `Incentives for ${month} (${listed.length} record(s)${former.length ? `: ${current.length} current employees, ${former.length} ${FORMER_PHRASE}s listed after them` : ''}):\n\n` + current.map(render).join(sep);
   if (former.length) text += `\n\nFormer employees (NOT current staff; leave out of current rankings and totals):\n` + former.map(render).join(sep);
   if (!userIds) text += '\n\n(Compact view. Name one person to see their goal-by-goal detail.)';
   if (!userIds && !sawAll(s.boss, s.ctx.role)) text += `\n(${PARTIAL_VIEW})`;
-  return out(text, { ...src, ids: ids as string[], currency: 'PKR' });
+  return out(text, { ...src, ids: listed.map((r: any) => r.user_id) as string[], currency: 'PKR' });
 }
 
 export async function getSalary(s: Scope, args: any): Promise<Out> {
@@ -385,6 +397,8 @@ export const COMPOSITE_FAILED = 'composite could not be loaded (lookup failed), 
 
 export async function getPerformance(s: Scope, args: any): Promise<Out> {
   const db = s.db;
+  const olView = !s.boss && isOlViewer(s.ctx.role);
+  const rated = olView ? RATED_ROLES.filter((r) => olMay('performance', r)) : RATED_ROLES;
   let userIds: string[] | null = null;
   let single: any = null;
   if (args?.person_name) {
@@ -392,6 +406,8 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
     if (!people.length) return out(await noActiveMatch(db, args.person_name), { table: 'performance_ratings' });
     if (people.length > 1) return out(multiple(args.person_name, people), { table: 'performance_ratings' });
     userIds = [people[0].id]; single = people[0];
+    // An OL's Performance page rates TLs, PCTLs, APCs and IPCs; no page rates other OLs, developers or ads managers.
+    if (olView && people[0].id !== s.ctx.userId && !olMay('performance', people[0].role)) return out(NOT_YOURS, { table: 'performance_ratings' });
   }
   let month = String(args?.month || '').trim();
   if (!month) {
@@ -407,11 +423,12 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
   // with nothing in the text to say so or to say what their role was. Only active,
   // non-deleted staff are ranked here; the Boss carries no score. `role` narrows it.
   const roleArg = String(args?.role || '').trim().toLowerCase();
+  if (olView && !args?.person_name && roleArg && !rated.includes(roleArg)) return out(NOT_YOURS, { table: 'performance_ratings' });
   let roster: any[] | null = null;
   if (!userIds) {
     // The roles the Performance page rates (listEvaluableUsers): not the Boss, developers or the Ads Manager.
     let pq = db.from('profiles').select('id, display_name, role, is_active, deleted_at')
-      .is('deleted_at', null).eq('is_active', true).in('role', roleArg ? [roleArg] : RATED_ROLES).limit(500);
+      .is('deleted_at', null).eq('is_active', true).in('role', roleArg ? [roleArg] : rated).limit(500);
     const { data: ppl } = await pq;
     roster = ppl || [];
   }
@@ -437,7 +454,7 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
   }
   const ids = [...new Set([...(ratings || []).map((r: any) => r.user_id), ...(userIds || []), ...(rosterIds || []), ...goneIds])];
   const pmap = await loadPeople(db, ids);
-  if (roster) goneIds = goneIds.filter((id) => { const g = pmap.get(id); return !!g && isFormer(g) && (roleArg ? g.role === roleArg : RATED_ROLES.includes(String(g.role))); });
+  if (roster) goneIds = goneIds.filter((id) => { const g = pmap.get(id); return !!g && isFormer(g) && (roleArg ? g.role === roleArg : rated.includes(String(g.role))); });
   const nameOf = new Map([...pmap].map(([id, p]) => [id, p.display_name]));
   const whoOf = (id: string) => (pmap.has(id) ? who(pmap.get(id)) : 'Unknown person');
 

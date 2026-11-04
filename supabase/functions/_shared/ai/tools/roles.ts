@@ -37,6 +37,19 @@ export const PAGE_ROLES: Record<string, readonly string[]> = {
   get_performance: ['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc'],                 // /performance
 };
 
+// What an OL can see of OTHER people in the app, per surface (audit 2026-11-04, from the page code):
+//   Performance page (performanceApi.js listEvaluableUsers): TLs, PCTLs, APCs, IPCs. Not OLs, developers, ads managers.
+//   Incentives page (OLIncentivesPage.jsx): ACTIVE apc, ipc, tl, ol, ads_manager. Not PCTLs, the Boss, former staff.
+//   Directory email / responsibilities (UserListPage, attendance roster): tl, pctl, ol, apc, ipc.
+// The tools apply these ONLY when the caller is an OL (the Boss sees all; the OL's own row is always theirs).
+export const OL_SEES = {
+  performance: ['tl', 'pctl', 'apc', 'ipc'],
+  incentives: ['apc', 'ipc', 'tl', 'ol', 'ads_manager'],
+  directory: ['tl', 'pctl', 'ol', 'apc', 'ipc'],
+} as const;
+export const isOlViewer = (role: unknown) => String(role ?? '') === 'ol';
+export const olMay = (surface: keyof typeof OL_SEES, targetRole: unknown) => (OL_SEES[surface] as readonly string[]).includes(String(targetRole ?? ''));
+
 export const pageAllows = (tool: string, role: string) =>
   !PAGE_ROLES[tool] || PAGE_ROLES[tool].includes(String(role || '').toLowerCase());
 
