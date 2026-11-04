@@ -11,7 +11,8 @@ export default function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = location.state?.from?.pathname || '/dashboard';
+  const from = location.state?.from;
+  const redirectTo = from?.pathname ? from.pathname + (from.search || '') : '/dashboard';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -99,6 +99,7 @@ export const EukaAnalyticsPage     = lazy(() => import('../pages/euka/EukaAnalyt
 export const HaloV2Page            = lazy(() => import('../pages/boss/HaloV2Page'));
 export const VideoReviewsPage      = lazy(() => import('../pages/video-reviews/VideoReviewsPage'));
 export const TikTokCallbackPage    = lazy(() => import('../pages/oauth/TikTokCallbackPage'));
+export const ConnectorConsentPage  = lazy(() => import('../pages/oauth/ConnectorConsentPage'));
 export const DevelopmentLayout     = lazy(() => import('../pages/development/DevelopmentLayout'));
 const devPage = (name) => lazy(() => import('../pages/development/pages').then((m) => ({ default: m[name] })));
 export const DevRoadmapPage   = devPage('RoadmapPage');

@@ -104,6 +104,7 @@ import {
   HaloV2Page,
   VideoReviewsPage,
   TikTokCallbackPage,
+  ConnectorConsentPage,
   DevelopmentLayout,
   DevRoadmapPage,
   DevOverviewPage,
@@ -224,6 +225,12 @@ export default function App() {
             <Route
               path="/oauth/tiktok/callback"
               element={<Suspense fallback={<PageFallback />}><TikTokCallbackPage /></Suspense>}
+            />
+
+            {/* "Connect WurxOS to Claude" consent (Supabase OAuth server). Signed-in only; sits outside the shell. */}
+            <Route
+              path="/oauth/consent"
+              element={<ProtectedRoute><Suspense fallback={<PageFallback />}><ConnectorConsentPage /></Suspense></ProtectedRoute>}
             />
 
             {/* Protected shell — NotificationsProvider needs an authenticated user.
