@@ -64,7 +64,11 @@ Deno.serve(async (req: Request) => {
   const role = p!.role as string;
 
   let body: unknown;
-  try { body = await req.json(); } catch { return reply({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, 400); }
+  try {
+    const raw = await req.text();
+    if (raw.length > 65_536) return reply({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Request too large' } }, 413);
+    body = JSON.parse(raw);
+  } catch { return reply({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, 400); }
 
   const userClient = createClient(URL_, ANON, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
   const ctx = { userId: u.user.id, role, userClient };
@@ -75,14 +79,20 @@ Deno.serve(async (req: Request) => {
     tools: () => TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
     callTool: async (name, args) => {
       if (!mcpAllowed(p)) return { text: 'Not available for your account.', isError: true };   // second check, in front of every tool
+      // Reserve first, then count: the call's own row is written BEFORE the tool runs, so parallel requests
+      // cannot all see an empty log. If the log cannot be written or read, the call is refused (fail closed).
+      const ins = await admin.from('mcp_call_log').insert({ user_id: ctx.userId, role, tool: name, args: JSON.stringify(args).slice(0, 1000), ok: true, ms: null }).select('id').single();
+      if (ins.error || !ins.data) return { text: 'The connector is temporarily unavailable. Try again in a moment.', isError: true };
       const since = new Date(Date.now() - 60_000).toISOString();
-      const { count } = await admin.from('mcp_call_log').select('id', { count: 'exact', head: true }).eq('user_id', ctx.userId).gte('created_at', since);
-      if (rateLimited(count)) return { text: `Too many requests (limit ${MCP_CALLS_PER_MINUTE} per minute). Wait a moment and ask again.`, isError: true };
+      const { count, error: cErr } = await admin.from('mcp_call_log').select('id', { count: 'exact', head: true }).eq('user_id', ctx.userId).gte('created_at', since);
+      if (cErr || rateLimited(typeof count === 'number' ? count - 1 : null)) {
+        admin.from('mcp_call_log').update({ ok: false }).eq('id', ins.data.id).then(() => {}, () => {});
+        return { text: `Too many requests (limit ${MCP_CALLS_PER_MINUTE} per minute). Wait a moment and ask again.`, isError: true };
+      }
       const t0 = Date.now();
       const r = await runDataTool(admin, ctx, name, args);
       const failed = /^Tool \S+ failed:/.test(r.text) || r.text.startsWith('Unknown tool');
-      // Best effort: the audit row must never turn a good answer into an error.
-      admin.from('mcp_call_log').insert({ user_id: ctx.userId, role, tool: name, args: JSON.stringify(args).slice(0, 1000), ok: !failed, ms: Date.now() - t0 }).then(() => {}, () => {});
+      admin.from('mcp_call_log').update({ ok: !failed, ms: Date.now() - t0 }).eq('id', ins.data.id).then(() => {}, () => {});
       return { text: r.text + sourceLine(r.source), isError: failed };
     },
   };

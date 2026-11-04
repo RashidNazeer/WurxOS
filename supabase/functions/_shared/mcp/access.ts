@@ -16,9 +16,9 @@ export function mcpAllowed(p: { role?: unknown; is_active?: unknown; deleted_at?
 }
 const ROLE_SET: Record<string, true> = Object.fromEntries(MCP_ROLES.map((r) => [r, true as const]));
 
-// `calls` = this person's calls in the last minute; null (count unavailable) fails open so a busy
-// database does not lock the Boss out.
-export const rateLimited = (calls: number | null | undefined) => typeof calls === 'number' && calls >= MCP_CALLS_PER_MINUTE;
+// `calls` = this person's PRIOR calls in the last minute (the current call's own row excluded). An unknown
+// count counts as limited: when the log cannot be read the connector stops, it never opens.
+export const rateLimited = (calls: number | null | undefined) => typeof calls !== 'number' || !Number.isFinite(calls) || calls >= MCP_CALLS_PER_MINUTE;
 
 // "Source: reports · 2026-10" — where a result came from, so Claude can cite it.
 export function sourceLine(s: { table: string; period?: string | null; brand?: string | null; status?: string | null }): string {

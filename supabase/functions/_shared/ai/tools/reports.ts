@@ -644,7 +644,7 @@ async function monthCreators(admin: Db, brand: any, period: Period, metric: stri
 export async function comparePeriods(admin: Db, ctx: ToolCtx, args: any): Promise<Out> {
   const src: ToolSource = { table: 'reports', status: APPROVED };
   const metric = String(args?.metric || '');
-  if (!REPORT_METRICS[metric]) return { text: `Unknown metric "${metric}". Use one of: ${METRIC_NAMES.join(', ')}.`, source: src };
+  if (!METRIC_NAMES.includes(metric)) return { text: `Unknown metric "${metric}". Use one of: ${METRIC_NAMES.join(', ')}.`, source: src };
   if (!args?.brand) return { text: 'Name the brand.', source: src };
   const scope = await brandScope(admin, ctx, String(args.brand));
   const bad = oneBrand(scope, String(args.brand));
@@ -722,7 +722,7 @@ export async function comparePeriods(admin: Db, ctx: ToolCtx, args: any): Promis
 export async function rankBrands(admin: Db, ctx: ToolCtx, args: any): Promise<Out> {
   const src: ToolSource = { table: 'reports', status: APPROVED };
   const metric = String(args?.metric || '');
-  const spec = REPORT_METRICS[metric];
+  const spec = METRIC_NAMES.includes(metric) ? REPORT_METRICS[metric] : undefined;
   if (!spec) return { text: `Unknown metric "${metric}". Use one of: ${METRIC_NAMES.join(', ')}.`, source: src };
   const period = resolvePeriod(args?.period);
   if (!period) return { text: 'Give a period (e.g. "August", "last week", "2026-08").', source: src };

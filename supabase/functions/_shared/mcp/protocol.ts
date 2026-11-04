@@ -2,6 +2,7 @@
 // Claude's custom connectors to list and call tools. Pure: the caller, the tool list and the tool
 // runner are injected, so this file knows nothing about Supabase.
 
+export const MAX_BATCH = 5;
 export const SUPPORTED_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'] as const;
 
 export type McpTool = { name: string; description: string; inputSchema: Record<string, unknown> };
@@ -63,7 +64,9 @@ export async function handleMessage(msg: Rpc, deps: McpDeps): Promise<RpcRespons
 export async function handleBody(body: unknown, deps: McpDeps): Promise<RpcResponse | RpcResponse[] | null> {
   if (Array.isArray(body)) {
     if (!body.length) return fail(null, -32600, 'Empty batch');
-    const out = (await Promise.all(body.map((m) => handleMessage(m, deps)))).filter((r): r is RpcResponse => r !== null);
+    if (body.length > MAX_BATCH) return fail(null, -32600, `Batch too large (max ${MAX_BATCH})`);
+    const out: RpcResponse[] = [];
+    for (const m of body) { const r = await handleMessage(m, deps); if (r) out.push(r); }   // one at a time, never in parallel
     return out.length ? out : null;
   }
   return handleMessage(body as Rpc, deps);

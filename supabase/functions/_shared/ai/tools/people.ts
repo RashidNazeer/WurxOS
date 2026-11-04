@@ -13,7 +13,7 @@
 
 import type { Db, ToolCtx, ToolSource } from './types.ts';
 import { hms, karachiMonthNow, money, monthToRange, pktTime, roleLabelOf } from './v1format.ts';
-import { isOlViewer, olMay } from './roles.ts';
+import { isOlViewer, olMay, OL_SEES } from './roles.ts';
 import { FORMER_PHRASE, formerMatches, isFormer, leftOn, loadPeople, noActiveMatch, PARTIAL_VIEW, roleCode, sawAll, who } from './who.ts';
 
 export type Out = { text: string; source: ToolSource };
@@ -27,15 +27,19 @@ export type Scope = { db: Db; svc: Db; ctx: ToolCtx; boss: boolean };
 export const NOT_YOURS = "That's not something I can show you.";
 
 const out = (text: string, source: ToolSource): Out => ({ text, source });
+const NO_ONE = '00000000-0000-0000-0000-000000000000';
 const aboutSomeoneElse = (s: Scope, ids: string[] | null) => !s.boss && !!ids && ids[0] !== s.ctx.userId;
 
 // Resolve a name → profile rows (active, non-deleted). Returns [] if none.
+// ilike treats % and _ as wildcards: a typed name must not be able to match everyone.
+export const likeEsc = (t: string) => t.replace(/[\\%_]/g, (c) => '\\' + c);
+
 export async function resolvePeople(db: Db, name: string) {
   const q = String(name || '').trim();
   if (!q) return [];
   const { data } = await db.from('profiles')
     .select('id, display_name, role')
-    .ilike('display_name', `%${q}%`)
+    .ilike('display_name', `%${likeEsc(q)}%`)
     .is('deleted_at', null)
     .limit(8);
   return data || [];
@@ -211,7 +215,7 @@ export async function findPerson(s: Scope, args: any): Promise<Out> {
   if (!q) return out('Provide a name to look up.', src);
   const { data: found } = await db.from('profiles')
     .select('id, display_name, role, email, reports_to, employment_type, start_date, responsibilities, is_active, deleted_at')
-    .ilike('display_name', `%${q}%`).limit(20);
+    .ilike('display_name', `%${likeEsc(q)}%`).limit(20);
   const people = (found || []).filter((p: any) => !isFormer(p)).slice(0, 8);
   const former = (found || []).filter((p: any) => isFormer(p));
   const formerNote = former.length ? `\nAlso matching, but ${FORMER_PHRASE}s (no longer work here): ${former.slice(0, 5).map((p: any) => who(p)).join('; ')}.` : '';
@@ -258,8 +262,10 @@ export async function getEmployees(s: Scope, args: any): Promise<Out> {
     .order('role', { ascending: true }).order('display_name', { ascending: true }).limit(300);
   if (!args?.include_inactive) q = q.is('deleted_at', null).eq('is_active', true);
   if (args?.role) q = q.eq('role', String(args.role));
-  if (args?.search) q = q.ilike('display_name', `%${String(args.search).trim()}%`);
-  const { data: emps } = await q;
+  if (args?.search) q = q.ilike('display_name', `%${likeEsc(String(args.search).trim())}%`);
+  const { data: raw } = await q;
+  // An OL's directory lists current tl/pctl/ol/apc/ipc only: no Boss, developers, ads managers or former staff.
+  const emps = !s.boss && isOlViewer(s.ctx.role) ? (raw || []).filter((e: any) => !isFormer(e) && olMay('directory', e.role)) : raw;
   if (!emps || !emps.length) return out('No employees match that filter.', src);
   const mgrIds = [...new Set(emps.map((e: any) => e.reports_to).filter(Boolean))];
   const { data: mgrs } = mgrIds.length
@@ -529,12 +535,12 @@ export async function getPerformance(s: Scope, args: any): Promise<Out> {
   }
   let fq = db.from('performance_flags').select('user_id, type, severity, reason, created_at').order('created_at', { ascending: false }).limit(userIds ? 30 : 50);
   if (userIds) fq = fq.in('user_id', userIds);
-  else if (rosterIds && rosterIds.length) fq = fq.in('user_id', rosterIds);
+  else if (rosterIds) fq = fq.in('user_id', rosterIds.length ? rosterIds : [NO_ONE]);   // an empty roster must not mean everyone
   if (monthRange) fq = fq.gte('created_at', monthRange.gte).lt('created_at', monthRange.lt);
   const { data: flags } = await fq;
   let wq = db.from('performance_warnings').select('user_id, reason, severity, created_at').order('created_at', { ascending: false }).limit(userIds ? 30 : 50);
   if (userIds) wq = wq.in('user_id', userIds);
-  else if (rosterIds && rosterIds.length) wq = wq.in('user_id', rosterIds);
+  else if (rosterIds) wq = wq.in('user_id', rosterIds.length ? rosterIds : [NO_ONE]);
   if (monthRange) wq = wq.gte('created_at', monthRange.gte).lt('created_at', monthRange.lt);
   const { data: warns } = await wq;
 
@@ -637,6 +643,7 @@ export async function getAttendance(s: Scope, args: any): Promise<Out> {
     if (!people.length) return out(await noActiveMatch(db, args.person_name), { table: 'attendance' });
     if (people.length > 1) return out(multiple(args.person_name, people), { table: 'attendance' });
     userIds = [people[0].id]; single = people[0];
+    if (!s.boss && isOlViewer(s.ctx.role) && people[0].id !== s.ctx.userId && !olMay('attendance', people[0].role)) return out(NOT_YOURS, { table: 'attendance' });
   }
   const other = aboutSomeoneElse(s, userIds);
   let month = String(args?.month || '').trim();
@@ -651,8 +658,9 @@ export async function getAttendance(s: Scope, args: any): Promise<Out> {
   // needs explicit ids; the team case enumerates active non-Boss staff.
   let rpcIds: string[] = userIds || [];
   if (!userIds) {
-    const { data: team } = await db.from('profiles')
-      .select('id').is('deleted_at', null).eq('is_active', true).neq('role', 'boss').limit(300);
+    let tq = db.from('profiles').select('id').is('deleted_at', null).eq('is_active', true).neq('role', 'boss').limit(300);
+    if (!s.boss && isOlViewer(s.ctx.role)) tq = tq.in('role', [...OL_SEES.attendance]);
+    const { data: team } = await tq;
     rpcIds = (team || []).map((p: any) => p.id);
   }
   let breakdown: any[] = [];

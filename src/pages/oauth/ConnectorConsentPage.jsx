@@ -7,6 +7,14 @@ import { useAuth } from '../../contexts/AuthContext';
 // it refuses every other role on every request. This only spares them a confusing Allow button.
 const CONNECTOR_ROLES = ['boss', 'ol'];
 
+// Dynamic client registration is on, so ANYONE can register an "app" named "Claude". A token minted here
+// works against the whole project API as the signed-in person, so only Claude's own callback hosts may be
+// approved; anything else can only be denied. (The redirect URI is the one the client registered.)
+const CLAUDE_HOSTS = ['claude.ai', 'www.claude.ai', 'claude.com', 'www.claude.com'];
+export function isClaudeRedirect(uri) {
+  try { const u = new URL(String(uri)); return u.protocol === 'https:' && !u.username && !u.password && CLAUDE_HOSTS.includes(u.hostname); } catch { return false; }
+}
+
 // Consent screen for "Connect WurxOS to Claude". Supabase Auth's OAuth server sends the person here
 // (Authentication → OAuth Server → Authorization Path = /oauth/consent) with ?authorization_id=…;
 // they approve or deny and the browser is sent back to Claude. The connector itself is the `mcp`
@@ -43,6 +51,7 @@ export default function ConnectorConsentPage() {
 
   async function decide(approve) {
     if (!allowed) return;
+    if (approve && !isClaudeRedirect(details?.redirect_uri)) return;
     setBusy(true);
     const call = approve ? supabase.auth.oauth.approveAuthorization : supabase.auth.oauth.denyAuthorization;
     const { data, error: e } = await call.call(supabase.auth.oauth, authorizationId);
@@ -60,6 +69,14 @@ export default function ConnectorConsentPage() {
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</p>
         ) : (
           <>
+            {!isClaudeRedirect(details.redirect_uri) ? (
+              <>
+                <p style={{ color: 'var(--danger)', fontSize: 14, lineHeight: 1.5 }}>
+                  This app is not Claude and cannot be connected to WurxOS. Do not approve it.
+                </p>
+                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => decide(false)}>Deny</button>
+              </>
+            ) : (<>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
               <strong>{details.client?.name || 'Claude'}</strong> is asking to read WurxOS data as you.
             </p>
@@ -72,6 +89,7 @@ export default function ConnectorConsentPage() {
               <button type="button" className="btn btn-primary" disabled={busy} onClick={() => decide(true)}>Allow</button>
               <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => decide(false)}>Deny</button>
             </div>
+            </>)}
           </>
         )}
       </div>

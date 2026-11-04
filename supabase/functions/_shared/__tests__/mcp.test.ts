@@ -67,13 +67,14 @@ test('batches: answers for requests only; a batch of notifications is null', asy
   assert.equal(empty.error.code, -32600);
 });
 
-test('access: Boss and OL only; 30 calls a minute; an unreadable count fails open', () => {
+test('access: Boss and OL only; 30 calls a minute; an unreadable count fails closed', () => {
   assert.deepEqual([...MCP_ROLES].sort(), ['boss', 'ol']);
   for (const r of ['developer', 'tl', 'pctl', 'apc', 'ipc', 'ads_manager', '', 'BOSS']) assert.ok(!MCP_ROLES.includes(r), r);
   assert.equal(rateLimited(MCP_CALLS_PER_MINUTE - 1), false);
   assert.equal(rateLimited(MCP_CALLS_PER_MINUTE), true);
-  assert.equal(rateLimited(null), false);
-  assert.equal(rateLimited(undefined), false);
+  assert.equal(rateLimited(null), true);
+  assert.equal(rateLimited(undefined), true);
+  assert.equal(rateLimited(NaN), true);
 });
 
 test('mcpAllowed: exact Boss/OL on an active account, nothing else gets in', () => {
@@ -104,4 +105,22 @@ test('the connector exposes Wurx Buddy\'s data tools, each with a JSON-schema ob
     assert.ok(t.description.length > 20, t.name);
   }
   for (const n of ['get_performance', 'get_reports', 'rank_brands', 'get_salary']) assert.ok(TOOL_DEFS.some((t) => t.name === n), n);
+});
+
+test('batches: more than 5 messages are refused, and a batch runs one message at a time', async () => {
+  const many: any = await handleBody(Array.from({ length: 6 }, (_, i) => rpc('ping', undefined, i + 1)), deps);
+  assert.equal(many.error.code, -32600);
+  let running = 0, peak = 0;
+  const slow: McpDeps = { ...deps, tools: () => [{ name: 'slow', description: 's', inputSchema: { type: 'object' } }],
+    callTool: async () => { running++; peak = Math.max(peak, running); await new Promise((r) => setTimeout(r, 5)); running--; return { text: 'ok' }; } };
+  await handleBody(Array.from({ length: 5 }, (_, i) => rpc('tools/call', { name: 'slow', arguments: {} }, i + 1)), slow);
+  assert.equal(peak, 1);
+});
+
+test('likeEsc: % _ and backslash in a typed name are escaped so they cannot match everyone', async () => {
+  const { likeEsc } = await import('../ai/tools/people.ts');
+  const bs = String.fromCharCode(92);   // one backslash, spelled out so no tool can mangle it
+  assert.equal(likeEsc('%'), bs + '%');
+  assert.equal(likeEsc('a_b%c' + bs + 'd'), 'a' + bs + '_b' + bs + '%c' + bs + bs + 'd');
+  assert.equal(likeEsc('Ali Hamza'), 'Ali Hamza');
 });
