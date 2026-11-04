@@ -203,7 +203,7 @@ t('a ticked option becomes a line with the sheet target', () => {
   assert.equal(line.targetValue, '10');
   assert.equal(line.brandId, 'b1');
   assert.equal(line.wbOption, 'creators_3plus');
-  assert.equal(line.amount, '', 'the PKR amount stays for the OL to type');
+  assert.equal(line.amount, '5000', 'an incentive line starts at PKR 5,000');
 });
 t('a ratio target is stored as a percentage, not 0.95', () => {
   const line = build(['b1::video_authorized']).add.incentives[0];
@@ -217,6 +217,17 @@ t('options land in the right section, and GMV Max keeps its auto source', () => 
   assert.equal(r.add.bonuses[0].wbOption, 'gmv_max');
   assert.equal(r.add.bonuses[0].source, 'gmv_max', 'achieved keeps coming from mig 317');
   assert.ok(!('source' in r.add.incentives[0]), 'the other options stay manual');
+});
+t('default amounts: PKR 5,000 on an incentive line, PKR 10,000 on a bonus line', () => {
+  const r = build(['b1::creators_3plus', 'b1::video_authorized', 'b1::gmv_max']);
+  assert.deepEqual(r.add.incentives.map((l) => l.amount), ['5000', '5000']);
+  assert.deepEqual(r.add.bonuses.map((l) => l.amount), ['10000']);
+  assert.deepEqual(M.DEFAULT_LINE_AMOUNT, { incentives: 5000, bonuses: 10000 });
+});
+t('a line already on the plan keeps its amount: only the target/marker are updated', () => {
+  const r = build(['b1::creators_3plus'], new Map([['b1::creators_3plus', 'line-1']]));
+  const upd = r.updates.get('line-1');
+  assert.ok(upd && !('amount' in upd), 'an existing amount is never overwritten with the default');
 });
 t('an option with no target this month is NEVER added as a blank line', () => {
   const r = build(['b1::onboarding_l3']);     // this grid has no such row
