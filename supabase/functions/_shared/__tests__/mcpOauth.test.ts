@@ -110,7 +110,7 @@ function memDb(users: Record<string, { id: string; email: string }>, profiles: R
     let rows = t[table]; const filt: Array<(r: Row) => boolean> = []; let patch: Row | null = null; let ins: Row | null = null; let head = false, count = false, single = false, retSel = false;
     const run = () => {
       if (ins) { if (table === 'mcp_oauth_tokens' && t[table].some((r) => r.access_hash === ins!.access_hash || r.refresh_hash === ins!.refresh_hash)) return { error: { message: 'dup' } };
-        t[table].push({ ...ins }); return { error: null }; }
+        t[table].push({ created_at: new Date().toISOString(), ...ins }); return { error: null }; }
       const hit = rows.filter((r) => filt.every((f) => f(r)));
       if (patch) { hit.forEach((r) => Object.assign(r, patch)); return { data: retSel ? hit.map((r) => ({ ...r })) : null, error: null }; }
       if (head && count) return { count: hit.length, error: null };
@@ -121,7 +121,7 @@ function memDb(users: Record<string, { id: string; email: string }>, profiles: R
       insert: (r: Row) => { ins = r; return api; }, update: (p: Row) => { patch = p; return api; },
       eq: (c: string, v: any) => { filt.push((r) => r[c] === v); return api; }, gte: (c: string, v: any) => { filt.push((r) => String(r[c]) >= String(v)); return api; },
       is: (c: string, v: any) => { filt.push((r) => (v === null ? r[c] == null : r[c] === v)); return api; },
-      maybeSingle: () => { single = true; return api; },
+      maybeSingle: () => { single = true; return api; }, limit: () => api,
       then: (ok: any, no: any) => Promise.resolve(run()).then(ok, no),
     };
     return api;
@@ -163,8 +163,10 @@ async function connect(db: any, who: string) {
   const auth = await O.authorize(new Request(`https://x.test/oauth/authorize?${authQ({ client_id: reg.client_id, resource: `${BASE}/mcp` })}`), cfg);
   const loc = new URL(auth.headers.get('Location')!);
   const requestId = loc.searchParams.get('request')!;
-  const dec = async (decision: string, jwt = who) => O.decision(post('/oauth/decision', JSON.stringify({ request: requestId, decision }), { Authorization: `Bearer ${jwt}` }), cfg);
-  return { cfg, reg, auth, loc, requestId, dec, verifier };
+  const cookie = (auth.headers.get('Set-Cookie') ?? '').split(';')[0];
+  const dec = async (decision: string, jwt = who, ck = cookie) =>
+    O.decision(post('/oauth/decision', JSON.stringify({ request: requestId, decision }), { Authorization: `Bearer ${jwt}`, ...(ck ? { Cookie: ck } : {}) }), cfg);
+  return { cfg, reg, auth, loc, requestId, dec, verifier, cookie };
 }
 
 test('flow: register -> authorize -> approve -> token -> refresh (rotating) works end to end for the Boss', async () => {
@@ -173,7 +175,7 @@ test('flow: register -> authorize -> approve -> token -> refresh (rotating) work
   assert.equal(f.auth.status, 302);
   assert.equal(f.loc.origin + f.loc.pathname, `${BASE}/oauth/consent`);
   const info: any = await jbody(await f.dec('info'));
-  assert.deepEqual(info, { client_name: 'Claude', redirect_host: 'claude.ai', email: 'boss@x.test' });
+  assert.deepEqual({ ...info, started_at: typeof info.started_at }, { client_name: 'Claude', redirect_host: 'claude.ai', email: 'boss@x.test', started_at: 'string' });
   const ok: any = await jbody(await f.dec('allow'));
   const cb = new URL(ok.redirect_url);
   assert.equal(cb.origin + cb.pathname, CB);
@@ -265,8 +267,29 @@ test('authorize: unknown client or unregistered redirect gives an error page, ne
   assert.equal(evil.headers.get('Location'), null);
   assert.equal((await O.register(post('/oauth/register', JSON.stringify({ redirect_uris: ['https://evil.com/cb'] })), cfg)).status, 400);
   assert.equal((await O.register(post('/oauth/register', 'x'.repeat(5000)), cfg)).status, 400);
-  for (let i = 0; i < 40; i++) await O.register(post('/oauth/register', JSON.stringify({ redirect_uris: [CB] })), cfg);
-  assert.equal((await O.register(post('/oauth/register', JSON.stringify({ redirect_uris: [CB] })), cfg)).status, 429);
+  // Flooding registration cannot grow the table: every registration of the same redirect set shares one client.
+  for (let i = 0; i < 40; i++) await O.register(post('/oauth/register', JSON.stringify({ redirect_uris: [CB], client_name: `spam ${i}` })), cfg);
+  assert.equal(db.t.mcp_oauth_clients.length, 1);
+  assert.equal((await O.register(post('/oauth/register', JSON.stringify({ redirect_uris: [CB] })), cfg)).status, 201);
+  const other = 'https://claude.com/api/mcp/auth_callback';
+  await O.register(post('/oauth/register', JSON.stringify({ redirect_uris: [other] })), cfg);
+  await O.register(post('/oauth/register', JSON.stringify({ redirect_uris: [other, CB] })), cfg);
+  assert.equal(db.t.mcp_oauth_clients.length, 3);                                              // at most three distinct sets exist
+});
+
+test('binding: a consent link opened in a different browser (no or wrong cookie) cannot be answered', async () => {
+  const db = mk(); const f = await connect(db, 'jwt-boss');
+  assert.match(f.auth.headers.get('Set-Cookie')!, /^wx_mcp_bind=wn_[A-Za-z0-9_-]{32}; Path=\/oauth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+  for (const d of ['info', 'allow', 'deny']) {
+    assert.equal((await f.dec(d, 'jwt-boss', '')).status, 403, `${d} without the cookie`);
+    assert.equal((await f.dec(d, 'jwt-boss', 'wx_mcp_bind=wn_' + 'A'.repeat(32))).status, 403, `${d} with a wrong cookie`);
+  }
+  assert.equal(db.t.mcp_oauth_codes.length, 0);
+  assert.equal(db.t.mcp_oauth_requests[0].decided_at ?? null, null);                          // still undecided: the real browser can answer
+  assert.equal((await f.dec('allow')).status, 200);
+  // the state is length-capped before anything is stored
+  const long = await O.authorize(new Request(`https://x.test/oauth/authorize?${authQ({ client_id: f.reg.client_id, state: 's'.repeat(600) })}`), f.cfg);
+  assert.equal(new URL(long.headers.get('Location')!).searchParams.get('error'), 'invalid_request');
 });
 
 test('revoke: either token ends the connection; unknown tokens still answer 200', async () => {

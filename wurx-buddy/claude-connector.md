@@ -16,8 +16,8 @@ Claude ──https://wurxos.vercel.app/mcp──▶ Vercel rewrite ──▶ edg
 - **Boss** → Wurx Buddy's data tools on the service client. **OL** → a *read-only* Postgres session as that person
   (`_shared/mcp/sqlBuilder.ts` + `mcp/pgExec.ts`: `role authenticated`, their id in the JWT claims, `read only`, 8 s
   timeout), so RLS decides, then `tools/roles.ts` `OL_SEES` narrows to what the app shows an OL; salary own-only.
-- Consent page `/oauth/consent` (app route, Boss/OL only) → `POST /oauth/decision` with the person's Supabase login.
-- Every tool call: logged (`mcp_call_log`, mig 435), 30/min, reserve-then-count, fail closed. Body ≤ 64 KB, batches ≤ 5.
+- Consent page `/oauth/consent` (app route, Boss/OL only) → `POST /oauth/decision` with the person's Supabase login AND the HttpOnly cookie set by `/oauth/authorize` (a link opened in another browser cannot be approved).
+- Every tool call: logged (`mcp_call_log`, mig 435), Boss 30/min and OL 12/min, at most 2 running at once per person and 6 OL sessions in all, reserve-then-count, fail closed. Body ≤ 64 KB, batches ≤ 5 run one at a time. Each OL call holds one database connection for its duration (set `MCP_DB_URL` to the transaction pooler, port 6543, if headroom is tight; check `select count(*) from pg_stat_activity` before go-live).
 
 ## Go-live (in this order; the Boss decides when)
 1. Supabase dashboard → Authentication → OAuth Server: **disable** it and "Allow Dynamic OAuth Apps"; delete any apps.

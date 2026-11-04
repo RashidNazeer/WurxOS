@@ -117,3 +117,16 @@ test('all data tools run on the SQL stand-in without an unsupported call (OL pat
   assert.ok(sqls.length > 20);
   for (const s of sqls) assert.ok(/^select /.test(s) && !/;/.test(s.replace(/'(?:[^']|'')*'/g, '')), s.slice(0, 120));   // one SELECT each, no stray statements outside literals
 });
+
+test('statement guard: a ; outside literals and quoted identifiers is refused; a default row cap applies', async () => {
+  const { hasStatementBreak, DEFAULT_LIMIT } = await import('../mcp/sqlBuilder.ts');
+  assert.equal(hasStatementBreak("select 1; select 2"), true);
+  assert.equal(hasStatementBreak("select 'a;b' as j"), false);
+  assert.equal(hasStatementBreak('select "we;ird" as j'), false);
+  assert.equal(hasStatementBreak("select 'it''s; fine' as j"), false);
+  assert.equal(hasStatementBreak("select 'x'; reset role; --'"), true);
+  const evil = qry('profiles').select('id').eq('display_name', "x'; reset role; --").sql();
+  assert.equal(hasStatementBreak(evil), false);                                                // the quote is escaped, so it stays inside the literal
+  assert.ok(qry('profiles').select('id').sql().endsWith(`limit ${DEFAULT_LIMIT}) q`));
+  assert.ok(qry('profiles').select('id').limit(5).sql().endsWith('limit 5) q'));
+});

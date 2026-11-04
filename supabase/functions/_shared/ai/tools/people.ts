@@ -730,7 +730,8 @@ export async function getAttendance(s: Scope, args: any): Promise<Out> {
   if (!teamRows.length) return out(`No attendance data for ${month || '(no data)'}.`, src);
   // People who clocked in during the month and have since left: their own block, never ranked with current staff.
   const fmtRow = (r: any) => `- ${r.name}: ${r.pctDisp != null ? `${r.pctDisp}%` : 'n/a'} (${r.present} present), ${hms(r.work)} worked`;
-  const formerIds = [...new Set(rows.map((a: any) => a.user_id))].filter((id: any) => !rpcIds.includes(id) && isFormer(pmap.get(id))) as string[];
+  const formerIds = [...new Set(rows.map((a: any) => a.user_id))].filter((id: any) => !rpcIds.includes(id) && isFormer(pmap.get(id))
+    && (s.boss || !isOlViewer(s.ctx.role) || olMay('attendance', pmap.get(id)?.role))) as string[];   // an OL's roster lists only its own roles
   let formerBlock = '';
   if (formerIds.length) {
     let fbd: any[] = [];

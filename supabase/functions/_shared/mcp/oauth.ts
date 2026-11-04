@@ -100,6 +100,7 @@ export function parseAuthorize(q: URLSearchParams, client: { client_id: string; 
   if (!client.redirect_uris.includes(redirectUri) || !redirectAllowed(redirectUri)) return { ok: false, to: 'page', error: 'invalid_request', description: 'redirect_uri does not match the registration' };
   const state = q.get('state');
   const back = (error: string, description: string): AuthReq => ({ ok: false, to: 'redirect', error, description, redirectUri, state });
+  if ((state ?? '').length > 512) return back('invalid_request', 'state is too long');
   if (q.get('response_type') !== 'code') return back('unsupported_response_type', 'response_type must be code');
   const challenge = q.get('code_challenge') ?? '';
   if (!challengeShapeOk(challenge)) return back('invalid_request', 'a valid code_challenge is required');

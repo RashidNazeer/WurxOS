@@ -20,6 +20,7 @@ const redirect = (to: string) => new Response(null, { status: 302, headers: { Lo
 export type Cfg = { admin: any; base: string };
 
 async function readBody(req: Request, max = 8192): Promise<string | null> {
+  if (Number(req.headers.get('content-length') ?? 0) > max) return null;      // do not even read an oversized body
   const raw = await req.text();
   return raw.length > max ? null : raw;
 }
@@ -36,15 +37,23 @@ export async function register(req: Request, { admin }: Cfg): Promise<Response> 
   try { body = JSON.parse(raw); } catch { return json({ error: 'invalid_client_metadata', error_description: 'JSON expected' }, 400); }
   const reg = parseRegistration(body);
   if (!reg.ok) return json({ error: reg.error, error_description: reg.description }, 400);
-  // Unauthenticated endpoint: a global ceiling keeps it from being used to fill the table.
-  const since = new Date(Date.now() - 3600_000).toISOString();
-  const { count, error: ce } = await admin.from('mcp_oauth_clients').select('client_id', { count: 'exact', head: true }).gte('created_at', since);
-  if (ce || (count ?? 0) >= 30) return json({ error: 'temporarily_unavailable', error_description: 'too many registrations, try later' }, 429, { 'Retry-After': '600' });
-  const clientId = `wxc_${randomId()}`;
-  const { error } = await admin.from('mcp_oauth_clients').insert({ client_id: clientId, client_name: reg.name, redirect_uris: reg.redirectUris });
-  if (error) return json({ error: 'server_error', error_description: 'could not register' }, 500);
+  // Unauthenticated endpoint, so it cannot be used to grow the table: the only redirect sets that can ever be
+  // registered are Claude's own, and every registration of the same set shares ONE client (clients are public,
+  // there is no secret to protect). The table stays at three rows whatever anyone sends.
+  const wanted = [...reg.redirectUris].sort().join(' ');
+  const { data: existing, error: le } = await admin.from('mcp_oauth_clients').select('client_id, client_name, redirect_uris').limit(10);
+  if (le) return json({ error: 'server_error', error_description: 'could not register' }, 500);
+  const same = (existing ?? []).find((c: any) => [...c.redirect_uris].sort().join(' ') === wanted);
+  let clientId: string; let name: string;
+  if (same) { clientId = same.client_id; name = same.client_name; }
+  else {
+    if ((existing ?? []).length >= 8) return json({ error: 'temporarily_unavailable', error_description: 'registration closed' }, 429, { 'Retry-After': '600' });
+    clientId = `wxc_${randomId()}`; name = reg.name;
+    const { error } = await admin.from('mcp_oauth_clients').insert({ client_id: clientId, client_name: name, redirect_uris: reg.redirectUris });
+    if (error) return json({ error: 'server_error', error_description: 'could not register' }, 500);
+  }
   return json({
-    client_id: clientId, client_id_issued_at: Math.floor(Date.now() / 1000), client_name: reg.name, redirect_uris: reg.redirectUris,
+    client_id: clientId, client_id_issued_at: Math.floor(Date.now() / 1000), client_name: name, redirect_uris: reg.redirectUris,
     grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'none',
   }, 201, NO_STORE);
 }
@@ -60,13 +69,32 @@ export async function authorize(req: Request, { admin, base }: Cfg): Promise<Res
     if (r.to === 'page') return text(`Cannot connect: ${r.description}.`);
     return redirect(redirectWith(r.redirectUri!, { error: r.error, error_description: r.description, state: r.state ?? undefined }));
   }
+  // Unauthenticated: a ceiling on pending requests keeps it from being used to fill the table.
+  const { count, error: ce } = await admin.from('mcp_oauth_requests').select('id_hash', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 60_000).toISOString());
+  if (ce || (count ?? 0) >= 60) return text('Too many connection attempts. Try again in a minute.', 429);
+  if (Math.random() < 0.03) admin.rpc('mcp_oauth_cleanup').then(() => {}, () => {});
+  // The request is bound to THIS browser by a cookie nonce, so a consent link forwarded to someone else
+  // (or a request started in another person's Claude) cannot be approved from a different browser.
   const id = randomToken('rq', 24);
+  const nonce = randomToken('wn', 24);
   const { error } = await admin.from('mcp_oauth_requests').insert({
-    id_hash: await sha256Hex(id), client_id: r.clientId, redirect_uri: r.redirectUri, state: r.state, code_challenge: r.challenge,
-    resource: r.resource, expires_at: new Date(Date.now() + REQUEST_TTL_S * 1000).toISOString(),
+    id_hash: await sha256Hex(id), binding_hash: await sha256Hex(nonce), client_id: r.clientId, redirect_uri: r.redirectUri, state: r.state,
+    code_challenge: r.challenge, resource: r.resource, expires_at: new Date(Date.now() + REQUEST_TTL_S * 1000).toISOString(),
   });
   if (error) return text('Cannot connect right now. Try again.', 503);
-  return redirect(`${trimBase(base)}/oauth/consent?request=${encodeURIComponent(id)}`);
+  return new Response(null, { status: 302, headers: {
+    Location: `${trimBase(base)}/oauth/consent?request=${encodeURIComponent(id)}`, ...NO_STORE,
+    'Set-Cookie': `${BIND_COOKIE}=${nonce}; Path=/oauth; Max-Age=${REQUEST_TTL_S}; HttpOnly; Secure; SameSite=Lax`,
+  } });
+}
+
+const BIND_COOKIE = 'wx_mcp_bind';
+function cookieOf(req: Request, name: string): string {
+  for (const part of String(req.headers.get('Cookie') ?? '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+  }
+  return '';
 }
 
 // ---- decision: called by the app's consent page with the person's Supabase login --------------
@@ -88,10 +116,15 @@ export async function decision(req: Request, { admin }: Cfg): Promise<Response> 
   const hash = await sha256Hex(id);
   const { data: rq } = await admin.from('mcp_oauth_requests').select('*').eq('id_hash', hash).maybeSingle();
   if (!rq || new Date(rq.expires_at).getTime() < Date.now() || rq.decided_at) return json({ error: 'expired', error_description: 'This request has expired. Start again from Claude.' }, 410);
+  // Same browser that started the connection, or nothing happens (a forwarded link is useless to the sender).
+  const nonce = cookieOf(req, BIND_COOKIE);
+  if (!nonce || !rq.binding_hash || !safeEqual(await sha256Hex(nonce), rq.binding_hash)) {
+    return json({ error: 'wrong_browser', error_description: 'Open this page in the same browser where you pressed Connect in Claude, or start again.' }, 403);
+  }
   const { data: client } = await admin.from('mcp_oauth_clients').select('client_name').eq('client_id', rq.client_id).maybeSingle();
 
   if (action === 'info') {
-    return json({ client_name: client?.client_name ?? 'Claude', redirect_host: new URL(rq.redirect_uri).hostname, email: u.user.email ?? null });
+    return json({ client_name: client?.client_name ?? 'Claude', redirect_host: new URL(rq.redirect_uri).hostname, email: u.user.email ?? null, started_at: rq.created_at });
   }
   // One decision per request: the update only succeeds while it is still undecided.
   const { data: won } = await admin.from('mcp_oauth_requests').update({ user_id: u.user.id, decided_at: new Date().toISOString() }).eq('id_hash', hash).is('decided_at', null).select('id_hash');

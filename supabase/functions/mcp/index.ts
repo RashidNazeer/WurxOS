@@ -17,7 +17,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { runDataTool, TOOL_DEFS } from '../_shared/ai/tools/index.ts';
 import { handleBody, type McpDeps } from '../_shared/mcp/protocol.ts';
-import { MCP_CALLS_PER_MINUTE, mcpAllowed, rateLimited, sourceLine } from '../_shared/mcp/access.ts';
+import { MCP_MAX_INFLIGHT_OL_TOTAL, MCP_MAX_INFLIGHT_PER_USER, callLimitFor, mcpAllowed, rateLimited, sourceLine, tooBusy } from '../_shared/mcp/access.ts';
 import { bearer, looksLikeOurAccessToken, resourceUrl, sha256Hex, trimBase } from '../_shared/mcp/oauth.ts';
 import * as O from './oauthRoutes.ts';
 import { userPgClient } from './pgExec.ts';
@@ -68,7 +68,8 @@ Deno.serve(async (req: Request) => {
   const tok = bearer(req.headers.get('Authorization'));
   if (!tok) return unauthenticated(false);
   if (!looksLikeOurAccessToken(tok)) return unauthenticated(true);
-  const { data: t } = await admin.from('mcp_oauth_tokens').select('user_id, resource, access_expires_at, revoked_at, last_used_at').eq('access_hash', await sha256Hex(tok)).maybeSingle();
+  const { data: t, error: te } = await admin.from('mcp_oauth_tokens').select('user_id, resource, access_expires_at, revoked_at, last_used_at').eq('access_hash', await sha256Hex(tok)).maybeSingle();
+  if (te) return reply({ error: 'temporarily_unavailable' }, 503);             // a database hiccup must not look like a bad token
   if (!t || t.revoked_at || new Date(t.access_expires_at).getTime() <= Date.now() || t.resource !== resourceUrl(BASE)) return unauthenticated(true);
   if (!t.last_used_at || Date.now() - new Date(t.last_used_at).getTime() > 300_000) {
     admin.from('mcp_oauth_tokens').update({ last_used_at: new Date().toISOString() }).eq('access_hash', await sha256Hex(tok)).then(() => {}, () => {});
@@ -107,16 +108,28 @@ Deno.serve(async (req: Request) => {
     tools: () => TOOL_DEFS.map((d) => ({ name: d.name, description: d.description, inputSchema: d.parameters })),
     callTool: async (name, args) => {
       if (!mcpAllowed(p)) return { text: 'Not available for your account.', isError: true };   // second check, in front of every tool
+      const limit = callLimitFor(role);
+      const since = new Date(Date.now() - 60_000).toISOString();
+      const busy = `Too many requests (limit ${limit} per minute, ${MCP_MAX_INFLIGHT_PER_USER} at a time). Wait a moment and ask again.`;
+      // Cheap look first, so an over-limit caller does not grow the log; then reserve, then count again.
+      const pre = await admin.from('mcp_call_log').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', since);
+      if (pre.error || rateLimited(pre.count, limit)) return { text: busy, isError: true };
       // Reserve first, then count: the call's own row is written BEFORE the tool runs, so parallel requests
       // cannot all see an empty log. If the log cannot be written or read, the call is refused (fail closed).
       const ins = await admin.from('mcp_call_log').insert({ user_id: userId, role, tool: name, args: JSON.stringify(args).slice(0, 1000), ok: true, ms: null }).select('id').single();
       if (ins.error || !ins.data) return { text: 'The connector is temporarily unavailable. Try again in a moment.', isError: true };
-      const since = new Date(Date.now() - 60_000).toISOString();
+      const give = (reason: string) => { admin.from('mcp_call_log').update({ ok: false }).eq('id', ins.data.id).then(() => {}, () => {}); return { text: reason, isError: true }; };
       const { count, error: cErr } = await admin.from('mcp_call_log').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', since);
-      if (cErr || rateLimited(typeof count === 'number' ? count - 1 : null)) {
-        admin.from('mcp_call_log').update({ ok: false }).eq('id', ins.data.id).then(() => {}, () => {});
-        return { text: `Too many requests (limit ${MCP_CALLS_PER_MINUTE} per minute). Wait a moment and ask again.`, isError: true };
+      if (cErr || rateLimited(typeof count === 'number' ? count - 1 : null, limit)) return give(busy);
+      // Calls still running (reserved, not finished) bound the database connections one person, and all OLs together, can hold.
+      const live = new Date(Date.now() - 30_000).toISOString();
+      const mine = await admin.from('mcp_call_log').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('ok', true).is('ms', null).gte('created_at', live);
+      if (mine.error || tooBusy(typeof mine.count === 'number' ? mine.count - 1 : null, MCP_MAX_INFLIGHT_PER_USER)) return give(busy);
+      if (role !== 'boss') {
+        const all = await admin.from('mcp_call_log').select('id', { count: 'exact', head: true }).eq('role', 'ol').eq('ok', true).is('ms', null).gte('created_at', live);
+        if (all.error || tooBusy(typeof all.count === 'number' ? all.count - 1 : null, MCP_MAX_INFLIGHT_OL_TOTAL)) return give(busy);
       }
+      if (Math.random() < 0.01) admin.rpc('mcp_oauth_cleanup').then(() => {}, () => {});
       const t0 = Date.now();
       const r = await runDataTool(admin, ctx, name, args);
       const failed = /^Tool \S+ failed:/.test(r.text) || r.text.startsWith('Unknown tool');

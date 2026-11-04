@@ -21,6 +21,7 @@ create table if not exists public.mcp_oauth_requests (          -- an /authorize
   id_hash        text primary key,
   client_id      text not null references public.mcp_oauth_clients(client_id) on delete cascade,
   redirect_uri   text not null,
+  binding_hash   text not null,                                   -- sha256 of the cookie nonce that ties the request to one browser
   state          text,
   code_challenge text not null,
   resource       text not null,
@@ -60,6 +61,8 @@ create table if not exists public.mcp_oauth_tokens (            -- one row per a
 );
 create index if not exists mcp_oauth_tokens_user_idx   on public.mcp_oauth_tokens (user_id) where revoked_at is null;
 create index if not exists mcp_oauth_tokens_family_idx on public.mcp_oauth_tokens (family_id);
+create index if not exists mcp_oauth_tokens_code_idx   on public.mcp_oauth_tokens (code_hash) where code_hash is not null;
+create index if not exists mcp_oauth_requests_created_idx on public.mcp_oauth_requests (created_at);
 create index if not exists mcp_oauth_clients_created_idx on public.mcp_oauth_clients (created_at);
 
 alter table public.mcp_oauth_clients  enable row level security;
@@ -100,6 +103,8 @@ begin
     return;
   end if;
   if t.revoked_at is not null or t.refresh_expires_at <= now() then return; end if;
+  -- A connection cannot be refreshed forever: after 90 days the person signs in again.
+  if (select min(x.created_at) from public.mcp_oauth_tokens x where x.family_id = t.family_id) < now() - interval '90 days' then return; end if;
   update public.mcp_oauth_tokens x set refresh_used_at = now(), revoked_at = now() where x.id = t.id;
   insert into public.mcp_oauth_tokens (family_id, user_id, client_id, resource, code_hash, access_hash, access_expires_at, refresh_hash, refresh_expires_at)
   values (t.family_id, t.user_id, t.client_id, t.resource, t.code_hash, p_new_access, p_access_exp, p_new_refresh, p_refresh_exp);
@@ -126,7 +131,26 @@ as $$
   delete from public.mcp_oauth_clients c
    where c.created_at < now() - interval '1 day'
      and not exists (select 1 from public.mcp_oauth_tokens t where t.client_id = c.client_id);
+  delete from public.mcp_call_log where created_at < now() - interval '90 days';
 $$;
+
+-- A connection ends the moment its owner stops being an active Boss or OL, and stays ended if they are
+-- promoted back (the function also re-checks the role on every request; this removes the stale tokens).
+create or replace function public.mcp_oauth_on_profile_change()
+ returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.is_active is not true or new.deleted_at is not null or new.role not in ('boss', 'ol') then
+    update public.mcp_oauth_tokens set revoked_at = now() where user_id = new.id and revoked_at is null;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists mcp_oauth_profile_change on public.profiles;
+create trigger mcp_oauth_profile_change after update of role, is_active, deleted_at on public.profiles
+  for each row when (old.role is distinct from new.role or old.is_active is distinct from new.is_active or old.deleted_at is distinct from new.deleted_at)
+  execute function public.mcp_oauth_on_profile_change();
+revoke execute on function public.mcp_oauth_on_profile_change() from public, anon, authenticated;
 
 revoke execute on function public.mcp_oauth_consume_code(text), public.mcp_oauth_rotate(text, text, text, text, timestamptz, timestamptz),
   public.mcp_oauth_revoke(text), public.mcp_oauth_cleanup() from public, anon, authenticated;

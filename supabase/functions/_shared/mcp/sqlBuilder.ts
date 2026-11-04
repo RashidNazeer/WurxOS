@@ -15,6 +15,14 @@ export type Json = unknown;
 export type RunSql = (text: string) => Promise<Json>;            // returns the single JSON value the statement selects
 export type Result = { data: any; error: null | { message: string; code?: string } };
 
+export const DEFAULT_LIMIT = 1000;
+
+// True when the statement text contains a ';' outside string literals and quoted identifiers, i.e. a second
+// statement. The executor refuses such text outright (belt and braces on top of escaping and the extended protocol).
+export function hasStatementBreak(sql: string): boolean {
+  return sql.replace(/'(?:[^']|'')*'/g, "''").replace(/"(?:[^"]|"")*"/g, '""').includes(';');
+}
+
 const IDENT = /^[a-z_][a-z0-9_]{0,62}$/;
 export function ident(s: unknown): string {
   if (typeof s !== 'string' || !IDENT.test(s)) throw new Error(`bad identifier: ${String(s).slice(0, 40)}`);
@@ -137,7 +145,7 @@ export class Query implements PromiseLike<Result> {
     if (!this.cols) throw new Error('select() first');
     const where = this.conds.length ? ` where ${this.conds.join(' and ')}` : '';
     const order = this.orders.length ? ` order by ${this.orders.join(', ')}` : '';
-    const limit = this.lim === null ? '' : ` limit ${this.lim}`;
+    const limit = ` limit ${this.lim ?? DEFAULT_LIMIT}`;                   // PostgREST caps unbounded reads too
     const inner = `select ${selectList(this.cols)}, row_number() over (${order ? order.trim() : ''}) as __n from public.${ident(this.table)} as t${where}${order}${limit}`;
     return `select coalesce(jsonb_agg((to_jsonb(q) - '__n') order by q.__n), '[]'::jsonb) as j from (${inner}) q`;
   }

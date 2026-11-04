@@ -124,3 +124,17 @@ test('likeEsc: % _ and backslash in a typed name are escaped so they cannot matc
   assert.equal(likeEsc('a_b%c' + bs + 'd'), 'a' + bs + '_b' + bs + '%c' + bs + bs + 'd');
   assert.equal(likeEsc('Ali Hamza'), 'Ali Hamza');
 });
+
+test('limits: the Boss 30 a minute, an OL 12 (each holds a database connection); in-flight caps; unknown counts block', async () => {
+  const a = await import('../mcp/access.ts');
+  assert.equal(a.callLimitFor('boss'), 30);
+  assert.equal(a.callLimitFor('ol'), 12);
+  assert.equal(a.callLimitFor('anything-else'), 12);
+  assert.equal(a.rateLimited(11, a.callLimitFor('ol')), false);
+  assert.equal(a.rateLimited(12, a.callLimitFor('ol')), true);
+  assert.equal(a.tooBusy(1, a.MCP_MAX_INFLIGHT_PER_USER), false);
+  assert.equal(a.tooBusy(2, a.MCP_MAX_INFLIGHT_PER_USER), true);
+  assert.equal(a.tooBusy(null, 2), true);
+  assert.equal(a.tooBusy(5, a.MCP_MAX_INFLIGHT_OL_TOTAL), false);
+  assert.equal(a.tooBusy(6, a.MCP_MAX_INFLIGHT_OL_TOTAL), true);
+});
