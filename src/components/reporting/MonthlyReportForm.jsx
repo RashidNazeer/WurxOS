@@ -16,7 +16,7 @@ import {
   MONTHLY_SECTIONS, resolveSectionsEnabled,
   cleanNumericInput,
 } from '../../utils/monthlyReportingService';
-import { findPreviousMonthlyReport } from '../../lib/reportsApi';
+import { findPreviousMonthlyReport, computeAllTimeGmv, num } from '../../lib/reportsApi';
 import { generateMonthlyKeyWinsInsight } from '../../utils/aiInsights';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
@@ -47,7 +47,7 @@ function issueSection(m) {
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
-function Field({ label, value, onChange, type = 'text', placeholder, width = '100%' }) {
+function Field({ label, value, onChange, type = 'text', placeholder, width = '100%', readOnly }) {
   // Use type="text" + inputMode="decimal" for numeric fields so users can paste
   // formatted strings like "$3,456.9" — type="number" silently rejects them.
   const isNum = type === 'number';
@@ -60,7 +60,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, width = '10
         inputMode={isNum ? 'decimal' : undefined}
         className="form-control form-control-sm"
         style={{ borderRadius: 'var(--radius-sm)' }}
-        placeholder={placeholder} value={value || ''}
+        placeholder={placeholder} value={value || ''} readOnly={readOnly}
         onChange={e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value)} />
     </div>
   );
@@ -365,6 +365,18 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     if (!current) return null;
     return findPreviousMonthlyReport(existingReports, current);
   }, [existingReports, selectedMonth, editReportId, selectedBrand?.id]);
+
+  // With an earlier report on file, All-time GMV is calculated, never typed. The first report of a
+  // brand stays manual: it is the opening balance the rest builds on.
+  const allTimeAuto = useMemo(() => {
+    if (!previousReport || !selectedMonth || !selectedBrand?.id) return null;
+    return computeAllTimeGmv(existingReports, selectedBrand.id, selectedMonth.monthKey, data.totalSales?.monthGmv);
+  }, [previousReport, existingReports, selectedMonth, selectedBrand?.id, data.totalSales?.monthGmv]);
+  useEffect(() => {
+    if (allTimeAuto == null) return;
+    if (num(data.totalSales?.allTimeGmv) !== allTimeAuto) setObj('totalSales', 'allTimeGmv', String(allTimeAuto));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTimeAuto]);
 
   // APC-only submission gates: duplicate month or prior not yet OL-approved
   const isApc = userRole === 'apc';
@@ -1003,7 +1015,11 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           <div style={{ width: 220 }}>
             <Field label={`All-time GMV (${curSym})`} type="number" placeholder="10168563.71"
               value={data.totalSales?.allTimeGmv}
+              readOnly={allTimeAuto != null}
               onChange={v => setObj('totalSales', 'allTimeGmv', v)} />
+            {allTimeAuto != null && (
+              <div style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)' }}>Calculated: all previous months + this month</div>
+            )}
           </div>
         </div>
       </SectionCard>
