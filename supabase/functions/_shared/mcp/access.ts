@@ -1,8 +1,9 @@
 // Who may use the connector and how fast. Pure, so it is tested without a database.
 
-// Owner request 2026-11-03: the Boss and the OLs (developers for support). Team Leads and below are not
-// let in: widening this is a one-line change once the Boss agrees.
-export const MCP_ROLES = ['boss', 'ol', 'developer'];
+// Owner 2026-11-04: the Boss and the OLs ONLY. Everyone else (TL, APC, IPC, developer, …) is refused,
+// here on every request and on the consent screen. Widening this is a deliberate, reviewed change.
+export const MCP_ROLES = ['boss', 'ol'];
+export const MCP_ROLES_LABEL = 'the Boss and Operations Leads';
 export const MCP_CALLS_PER_MINUTE = 30;
 
 // `calls` = this person's calls in the last minute; null (count unavailable) fails open so a busy

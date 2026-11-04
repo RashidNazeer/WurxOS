@@ -6,9 +6,9 @@
 // and signs the person in through Supabase Auth's OAuth server (this function only advertises it, see
 // /.well-known/oauth-protected-resource). Every call then runs as that person:
 //   • Boss  → the same data tools as Wurx Buddy on the service client (the Boss sees everything);
-//   • OL / developer → the person's OWN JWT client, so table RLS decides exactly as in the app, plus the
+//   • OL → the person's OWN JWT client, so table RLS decides exactly as in the app, plus the
 //     app's page guards in tools/roles.ts. Others' pay is refused, never hinted at.
-// Roles allowed in: boss, ol, developer. Each tool call is logged (mcp_call_log, mig 435) and rate limited.
+// Roles allowed in: boss and ol ONLY. Each tool call is logged (mcp_call_log, mig 435) and rate limited.
 //
 // Deploy WITH --no-verify-jwt: the unauthenticated 401 + discovery document must be reachable, and the
 // token is verified here with auth.getUser(). Deploy: `supabase functions deploy mcp --no-verify-jwt`.

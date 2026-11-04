@@ -67,9 +67,9 @@ test('batches: answers for requests only; a batch of notifications is null', asy
   assert.equal(empty.error.code, -32600);
 });
 
-test('access: Boss, OL and developer only; 30 calls a minute; an unreadable count fails open', () => {
-  assert.deepEqual([...MCP_ROLES].sort(), ['boss', 'developer', 'ol']);
-  for (const r of ['tl', 'pctl', 'apc', 'ipc', 'ads_manager']) assert.ok(!MCP_ROLES.includes(r), r);
+test('access: Boss and OL only; 30 calls a minute; an unreadable count fails open', () => {
+  assert.deepEqual([...MCP_ROLES].sort(), ['boss', 'ol']);
+  for (const r of ['developer', 'tl', 'pctl', 'apc', 'ipc', 'ads_manager', '', 'BOSS']) assert.ok(!MCP_ROLES.includes(r), r);
   assert.equal(rateLimited(MCP_CALLS_PER_MINUTE - 1), false);
   assert.equal(rateLimited(MCP_CALLS_PER_MINUTE), true);
   assert.equal(rateLimited(null), false);
