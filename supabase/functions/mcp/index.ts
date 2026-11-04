@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     const since = new Date(Date.now() - 60_000).toISOString();
     const { count } = await admin.from('mcp_call_log').select('id', { count: 'exact', head: true }).eq('user_id', u.user.id).gte('created_at', since);
     if ((count ?? 0) < 5) admin.from('mcp_call_log').insert({ user_id: u.user.id, role: String(p?.role ?? 'unknown').slice(0, 40), tool: '(refused)', args: null, ok: false, ms: 0 }).then(() => {}, () => {});
-    return reply({ error: 'forbidden' }, 403);
+    return reply({ error: 'not found' }, 404);   // to anyone else the connector does not exist
   }
   const role = p!.role as string;
 

@@ -54,13 +54,7 @@ export default function ConnectorConsentPage() {
     <div style={wrap}>
       <div style={card}>
         <h1 style={{ fontSize: 20, margin: '0 0 8px', color: 'var(--text-primary)' }}>Connect WurxOS to Claude</h1>
-        {loading ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</p>
-        ) : !allowed ? (
-          <p style={{ color: 'var(--danger)', fontSize: 14 }}>
-            The Claude connector is only available to the Boss and Operations Leads. Your account can't connect it.
-          </p>
-        ) : error ? (
+        {error ? (
           <p style={{ color: 'var(--danger)', fontSize: 14 }}>{error}</p>
         ) : !details ? (
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</p>
