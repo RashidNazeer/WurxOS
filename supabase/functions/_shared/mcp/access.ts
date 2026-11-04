@@ -6,6 +6,16 @@ export const MCP_ROLES = ['boss', 'ol'];
 export const MCP_ROLES_LABEL = 'the Boss and Operations Leads';
 export const MCP_CALLS_PER_MINUTE = 30;
 
+// The ONE gate. Exact match on the role stored in profiles (never from the token, a header or an argument):
+// no trimming, no case folding, so 'OL', ' ol' or 'ol ' are NOT roles and are refused. A deactivated or
+// deleted account is refused whatever its role. Anything unexpected (null, a non-string) is refused.
+export function mcpAllowed(p: { role?: unknown; is_active?: unknown; deleted_at?: unknown } | null | undefined): boolean {
+  if (!p || typeof p.role !== 'string') return false;
+  if (p.is_active !== true || p.deleted_at) return false;
+  return Object.prototype.hasOwnProperty.call(ROLE_SET, p.role);
+}
+const ROLE_SET: Record<string, true> = Object.fromEntries(MCP_ROLES.map((r) => [r, true as const]));
+
 // `calls` = this person's calls in the last minute; null (count unavailable) fails open so a busy
 // database does not lock the Boss out.
 export const rateLimited = (calls: number | null | undefined) => typeof calls === 'number' && calls >= MCP_CALLS_PER_MINUTE;

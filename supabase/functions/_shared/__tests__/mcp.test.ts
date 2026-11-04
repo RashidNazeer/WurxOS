@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { handleBody, handleMessage, SUPPORTED_VERSIONS, type McpDeps } from '../mcp/protocol.ts';
-import { MCP_CALLS_PER_MINUTE, MCP_ROLES, rateLimited, sourceLine } from '../mcp/access.ts';
+import { MCP_CALLS_PER_MINUTE, MCP_ROLES, mcpAllowed, rateLimited, sourceLine } from '../mcp/access.ts';
 import { TOOL_DEFS } from '../ai/tools/index.ts';
 
 const calls: Array<[string, unknown]> = [];
@@ -74,6 +74,22 @@ test('access: Boss and OL only; 30 calls a minute; an unreadable count fails ope
   assert.equal(rateLimited(MCP_CALLS_PER_MINUTE), true);
   assert.equal(rateLimited(null), false);
   assert.equal(rateLimited(undefined), false);
+});
+
+test('mcpAllowed: exact Boss/OL on an active account, nothing else gets in', () => {
+  const on = { is_active: true, deleted_at: null };
+  assert.equal(mcpAllowed({ role: 'boss', ...on }), true);
+  assert.equal(mcpAllowed({ role: 'ol', ...on }), true);
+  for (const role of ['apc', 'ipc', 'tl', 'pctl', 'developer', 'ads_manager', 'OL', 'Boss', ' ol', 'ol ', 'ol\n', 'o l', '', 'admin', 'service_role', '__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
+    assert.equal(mcpAllowed({ role, ...on }), false, JSON.stringify(role));
+  }
+  for (const role of [null, undefined, 1, true, ['ol'], { toString: () => 'ol' }]) assert.equal(mcpAllowed({ role, ...on }), false, String(role));
+  assert.equal(mcpAllowed({ role: 'ol', is_active: false, deleted_at: null }), false);
+  assert.equal(mcpAllowed({ role: 'ol', is_active: null, deleted_at: null }), false);
+  assert.equal(mcpAllowed({ role: 'ol', is_active: undefined, deleted_at: null }), false);
+  assert.equal(mcpAllowed({ role: 'boss', is_active: true, deleted_at: '2026-10-12T00:00:00Z' }), false);
+  assert.equal(mcpAllowed(null), false);
+  assert.equal(mcpAllowed(undefined), false);
 });
 
 test('sourceLine: empty for no source, otherwise the table, brand and period', () => {

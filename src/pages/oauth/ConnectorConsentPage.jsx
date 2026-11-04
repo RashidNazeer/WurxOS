@@ -21,7 +21,7 @@ const card = {
 export default function ConnectorConsentPage() {
   const [params] = useSearchParams();
   const { profile, loading } = useAuth();
-  const allowed = CONNECTOR_ROLES.includes(String(profile?.role || '').toLowerCase());
+  const allowed = profile?.is_active === true && CONNECTOR_ROLES.includes(profile?.role);
   const authorizationId = params.get('authorization_id') || '';
   const [details, setDetails] = useState(null);
   const [error, setError] = useState('');
