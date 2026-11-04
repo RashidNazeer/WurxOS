@@ -1576,6 +1576,32 @@ export function findPreviousMonthlyReport(reports, currentReport) {
   return sorted[0] || null;
 }
 
+// All-time GMV = GMV the brand had before its first WurxOS report + every month's GMV up to and
+// including `monthKey`. The opening balance is the earliest report's typed all-time minus its own
+// month, so one mistyped later all-time can never skew the running total (Pure Daily Care's Sep
+// 2026 report had 5.67M typed against 11.02M the month before: a false -48.5%).
+// `currentGmv` overrides the current month's stored GMV while the form is still being edited.
+export function computeAllTimeGmv(reports, brandId, monthKey, currentGmv) {
+  const byMonth = new Map();
+  for (const r of reports || []) {
+    if (r.brandId !== brandId || !r.monthKey || r.status === 'rejected') continue;
+    const have = byMonth.get(r.monthKey);
+    if (!have || (r.updatedAt || '') > (have.updatedAt || '')) byMonth.set(r.monthKey, r);
+  }
+  const months = [...byMonth.values()].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  const gmvOf = (r) => num(r.totalSales?.monthGmv) || num(r.keyMetrics?.gmv);
+  const first = months[0];
+  const opening = first && first.monthKey < monthKey
+    ? Math.max(0, num(first.totalSales?.allTimeGmv) - gmvOf(first))
+    : 0;
+  let sum = opening;
+  for (const r of months) {
+    if (r.monthKey < monthKey) sum += gmvOf(r);
+  }
+  const cur = currentGmv != null ? num(currentGmv) : gmvOf(byMonth.get(monthKey) || {});
+  return Math.round((sum + cur) * 100) / 100;
+}
+
 // Numeric helpers (v1's `num`, `pctChange`, `cleanNumericInput`)
 //
 // `num()` is a tolerant numeric parser. Accepts: "1234", "1,234",
