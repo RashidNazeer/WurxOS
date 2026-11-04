@@ -265,6 +265,7 @@ export async function runDataTool(admin: Db, ctx: ToolCtx, name: string, args: a
     return { name, text: b.text, source, truncated: b.truncated, ...(r.data !== undefined ? { data: r.data } : {}) };
   } catch (e) {
     const err = e as { message?: string; details?: string };
-    return { name, text: `Tool ${name} failed: ${String(err?.message || e).slice(0, 150)}${err?.details ? ` (${String(err.details).slice(0, 150)})` : ''}`, source: { table: 'none' }, truncated: false };
+    // Database error text goes to the Boss only; anyone else gets no internals.
+    return { name, text: boss ? `Tool ${name} failed: ${String(err?.message || e).slice(0, 150)}${err?.details ? ` (${String(err.details).slice(0, 150)})` : ''}` : `Tool ${name} failed: please try again.`, source: { table: 'none' }, truncated: false };
   }
 }

@@ -46,6 +46,7 @@ export const OL_SEES = {
   performance: ['tl', 'pctl', 'apc', 'ipc'],
   incentives: ['apc', 'ipc', 'tl', 'ol', 'ads_manager'],
   directory: ['tl', 'pctl', 'ol', 'apc', 'ipc'],
+  attendance: ['tl', 'pctl', 'ol', 'apc', 'ipc'],   // the attendance roster
 } as const;
 export const isOlViewer = (role: unknown) => String(role ?? '') === 'ol';
 export const olMay = (surface: keyof typeof OL_SEES, targetRole: unknown) => (OL_SEES[surface] as readonly string[]).includes(String(targetRole ?? ''));

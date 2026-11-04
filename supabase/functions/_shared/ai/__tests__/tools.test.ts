@@ -779,3 +779,14 @@ test('OL fails closed: with no client of their own nothing is read through the s
     assert.equal((await runDataTool(admin, ol as any, tool, { brand: 'x' })).text, NOT_YOURS, tool);
   }
 });
+
+test('OL: employees list and attendance follow the directory (no Boss, developers, ads managers or former staff)', async () => {
+  const rows = [...OL_PEOPLE, { id: 'u-b', display_name: 'The Boss', role: 'boss', reports_to: null, deleted_at: null, is_active: true },
+    { id: 'u-dev', display_name: 'Dev One', role: 'developer', reports_to: null, deleted_at: null, is_active: true }];
+  const ol = { userId: 'u-ol', role: 'ol', userClient: fakeDb({ profiles: rows, attendance: [] }, { attendance_month_breakdown_bulk: () => [] }) };
+  const emp = (await runDataTool(fakeDb({}), ol, 'get_employees', { include_inactive: true })).text;
+  for (const gone of ['The Boss', 'Dev One', 'Ads Person', 'Gone Apc']) assert.ok(!emp.includes(gone), gone);
+  for (const here of ['Apc One', 'Tl One', 'Pc Lead', 'Ol Two']) assert.ok(emp.includes(here), here);
+  assert.equal((await runDataTool(fakeDb({}), ol, 'get_attendance', { person_name: 'Dev One', month: '2026-10' })).text, NOT_YOURS);
+  assert.equal((await runDataTool(fakeDb({}), ol, 'get_attendance', { person_name: 'Ads Person', month: '2026-10' })).text, NOT_YOURS);
+});
