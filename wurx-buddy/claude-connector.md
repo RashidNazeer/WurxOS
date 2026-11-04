@@ -1,32 +1,49 @@
 # Claude connector (MCP) — runbook
 
-WurxOS as a read-only connector for claude.ai. Boss and OL roles ONLY (`_shared/mcp/access.ts`).
+WurxOS as a read-only connector for claude.ai. **Boss and OL roles ONLY** (`_shared/mcp/access.ts`, read from the
+database on every request). To everyone else it does not exist (404; the consent route redirects away).
 
-## What ships
-- `supabase/functions/mcp` — MCP over HTTP; tools = Wurx Buddy's data tools (`_shared/ai/tools`). Boss runs on the service client; OL on their own JWT so RLS applies, plus the page guards in `tools/roles.ts`.
-- `supabase/migrations/435_mcp_call_log.sql` — audit log (Boss-readable) that also backs the 30 calls/minute limit.
-- `/oauth/consent` (`src/pages/oauth/ConnectorConsentPage.jsx`) — the Allow/Deny screen.
+## Architecture (the security layer is ours)
+```
+Claude ──https://wurxos.vercel.app/mcp──▶ Vercel rewrite ──▶ edge function `mcp`
+         /.well-known/oauth-*  /oauth/{register,authorize,decision,token,revoke}   (same rewrites)
+```
+- **Our own OAuth 2.1** (authorization code + PKCE S256, public clients, dynamic registration restricted to
+  Claude's two exact callback URLs). Tokens are opaque (`wxa_…` access 1 h, `wxr_…` refresh 30 d, rotating, reuse
+  revokes the family), stored as SHA-256 hashes in `mcp_oauth_*` (mig 436, service-role only). They are **not Supabase
+  tokens**: they work only at `/mcp`, never against PostgREST, Auth or other functions.
+- **Supabase's own OAuth Server must stay OFF** (and "Allow Dynamic OAuth Apps" off, no registered apps).
+- **Boss** → Wurx Buddy's data tools on the service client. **OL** → a *read-only* Postgres session as that person
+  (`_shared/mcp/sqlBuilder.ts` + `mcp/pgExec.ts`: `role authenticated`, their id in the JWT claims, `read only`, 8 s
+  timeout), so RLS decides, then `tools/roles.ts` `OL_SEES` narrows to what the app shows an OL; salary own-only.
+- Consent page `/oauth/consent` (app route, Boss/OL only) → `POST /oauth/decision` with the person's Supabase login.
+- Every tool call: logged (`mcp_call_log`, mig 435), 30/min, reserve-then-count, fail closed. Body ≤ 64 KB, batches ≤ 5.
 
 ## Go-live (in this order; the Boss decides when)
-1. Apply migration 435.
-2. Deploy: `npx supabase functions deploy mcp --no-verify-jwt --project-ref xoaaidgvblondjpvxjqp --use-api`
-3. Supabase dashboard → Authentication → OAuth Server: enable it, allow dynamic client registration, set
-   Authorization Path = `/oauth/consent`. (The site URL must be the production app URL.)
-4. claude.ai (workspace admin) → Settings → Connectors → Add custom connector →
-   `https://xoaaidgvblondjpvxjqp.supabase.co/functions/v1/mcp`. Each person signs in on first use.
-5. Test as the Boss: ask "who has the highest performance score among TLs in October?" (expect Muhammad Azam, 79,
-   2026-11-03), then as an OL: ask for another person's salary (expect a refusal).
+1. Supabase dashboard → Authentication → OAuth Server: **disable** it and "Allow Dynamic OAuth Apps"; delete any apps.
+2. Merge the PR, apply migrations 435 and 436, deploy: `npx supabase functions deploy mcp --no-verify-jwt --project-ref xoaaidgvblondjpvxjqp --use-api` (Vercel deploys the rewrites from `vercel.json` on merge).
+3. Check: `curl https://wurxos.vercel.app/.well-known/oauth-authorization-server` and `…/oauth-protected-resource/mcp`
+   return JSON; `POST https://wurxos.vercel.app/mcp` with no token returns 401 + `WWW-Authenticate`.
+4. Each Boss/OL (own Claude, Pro/Max): Settings → Connectors → Add custom connector → `https://wurxos.vercel.app/mcp`
+   → Connect → sign in to WurxOS → Allow.
+5. Test as the Boss ("who has the highest performance score among TLs in October?" → Muhammad Azam, 79), then as an
+   OL (another person's salary → refused; another OL's performance → refused).
 
-## Notes
-- Read-only by design. Writes need a confirmation step and a separate review.
-- Audit: `select * from mcp_call_log order by id desc` (Boss). Nothing prunes it yet.
-- To let more roles in, edit `MCP_ROLES`; to change the limit, `MCP_CALLS_PER_MINUTE`.
-
-## Hidden from everyone else
-- `/oauth/consent` redirects any other role to the dashboard, as for an unknown URL; its code chunk is never requested.
-- The `mcp` endpoint answers 404 (not 403) to a signed-in account that is not an active Boss or OL, so it looks nonexistent.
-- Unavoidable: an unauthenticated request gets 401 and the OAuth discovery document (Claude needs both to start sign-in), and the compiled app files are static assets.
+## Controls
+- Kill switch: `update app_config set value='false' where key='mcp_enabled'` (insert the row if absent) stops sign-in
+  and every call; `select mcp_revoke_all()` (Boss) revokes every connection; `mcp_connections()` /
+  `mcp_revoke_connection(family)` list and revoke one.
+- Audit: `select * from mcp_call_log order by id desc` (Boss). Refused attempts are logged as `(refused)`.
+- Widening roles is a deliberate, reviewed change to `MCP_ROLES`.
 
 ## OL sees what the app shows an OL (audit 2026-11-04)
-The OL runs on their own login, and `tools/roles.ts` `OL_SEES` narrows what RLS would allow to the app's pages: Performance = TL/PCTL/APC/IPC (no other OLs, ads managers, developers); Incentives = active apc/ipc/tl/ol/ads_manager (no PCTLs, no former staff); directory email/responsibilities = tl/pctl/ol/apc/ipc; no employment type or start date of others; salary = own only. An OL with no client of their own is refused, never served by the service client. The Boss is unrestricted.
-Still to verify once the OAuth Server is on: that connector tokens carry the `authenticated` role so RLS applies (test as a real OL).
+`tools/roles.ts` `OL_SEES`: Performance = TL/PCTL/APC/IPC; Incentives = active apc/ipc/tl/ol/ads_manager; directory
+email/responsibilities = tl/pctl/ol/apc/ipc; attendance roster = tl/pctl/ol/apc/ipc; no employment type or start date of
+others; salary own-only. An OL with no database session of their own is refused, never served by the service client.
+
+## Known limits
+- A person can be tricked into approving a connection someone else started in their own Claude (the consent page says
+  to approve only if you just pressed Connect). Tokens are read-only and logged, and revocable.
+- Not yet verified against real Claude: the exact registration/token requests it sends. The first live connection is
+  the test; log request shapes (no secrets) if it fails.
+- Not yet verified: the `postgres` driver connecting from the edge runtime with `SUPABASE_DB_URL`.

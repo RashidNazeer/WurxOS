@@ -3,6 +3,26 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/mcp",
+      "destination": "https://xoaaidgvblondjpvxjqp.supabase.co/functions/v1/mcp"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource/mcp",
+      "destination": "https://xoaaidgvblondjpvxjqp.supabase.co/functions/v1/mcp/.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "https://xoaaidgvblondjpvxjqp.supabase.co/functions/v1/mcp/.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "https://xoaaidgvblondjpvxjqp.supabase.co/functions/v1/mcp/.well-known/oauth-authorization-server"
+    },
+    {
+      "source": "/oauth/:endpoint(register|authorize|decision|token|revoke)",
+      "destination": "https://xoaaidgvblondjpvxjqp.supabase.co/functions/v1/mcp/oauth/:endpoint"
+    },
+    {
       "source": "/sb-auth/:path*",
       "destination": "https://xoaaidgvblondjpvxjqp.supabase.co/auth/v1/:path*"
     },
