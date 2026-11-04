@@ -24,7 +24,8 @@ import { userPgClient } from './pgExec.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const DB_URL = Deno.env.get('SUPABASE_DB_URL') ?? '';
+// MCP_DB_URL (optional secret) points at the transaction pooler (port 6543) if direct connections get tight.
+const DB_URL = Deno.env.get('MCP_DB_URL') ?? Deno.env.get('SUPABASE_DB_URL') ?? '';
 // The origin Claude talks to. Configuration, never taken from the request.
 const BASE = trimBase(Deno.env.get('MCP_PUBLIC_BASE') ?? 'https://wurxos.vercel.app');
 
