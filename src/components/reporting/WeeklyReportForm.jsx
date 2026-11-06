@@ -1537,13 +1537,16 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                   <li>Overall: GMV, Affiliate GMV, Orders{autofillProvider === 'reacher' ? ', Videos Posted, Shop Performance Score' : ''}{eukaResult.meta?.mtdGmv != null ? ', GMV Month-to-Date' : ''}</li>
                   <li>Top {eukaResult.meta?.creatorCount || 0} creators (handle, videos, GMV)</li>
                   <li>Top {eukaResult.meta?.productCount || 0} products (name, ID, orders, GMV)</li>
+                  {autofillProvider === 'euka' && (
+                    <li>Top {eukaResult.meta?.videoCount || 0} videos (creator, link, items sold, GMV, views, product clicks)</li>
+                  )}
                 </ul>
                 {/* Euka refused part of the request: say so, instead of a green tick
                     over "Top 0 creators" that reads as "this brand had none". */}
                 {eukaResult.meta?.skipped?.length > 0 && (
                   <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 'var(--radius-md)', background: 'var(--warning-soft)', color: 'var(--warning)', fontWeight: 600 }}>
                     <i className="bi bi-exclamation-triangle-fill me-1" />
-                    {providerName} would not return {eukaResult.meta.skipped.map((s) => (s === 'topCreators' ? 'top creators' : s === 'productHighlights' ? 'product highlights' : s)).join(' or ')} this time — those tables were left as they were. Try again, or fill them manually.
+                    {providerName} would not return {eukaResult.meta.skipped.map((s) => (s === 'topCreators' ? 'top creators' : s === 'productHighlights' ? 'product highlights' : s === 'topVideos' ? 'top videos' : s)).join(' or ')} this time — those tables were left as they were. Try again, or fill them manually.
                   </div>
                 )}
                 <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>

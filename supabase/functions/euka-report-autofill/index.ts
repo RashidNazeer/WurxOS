@@ -19,6 +19,8 @@
 //                       unitsSold (per-product orders — the report's "Orders"
 //                       column), gmv (per-product affiliateGmv), all straight
 //                       from /dashboard/products-performance
+//   topVideos[]:        TOP 5 by revenue — creator (@handle), TikTok link, itemsSold, gmv
+//                       (revenue), views, productClicks (/dashboard/top-videos-by-revenue)
 //   overallInsights:    a short auto-generated summary
 //
 // AuthZ: OL/Boss any brand; TL the brand they own; APC/IPC a brand assigned to
@@ -259,7 +261,7 @@ Deno.serve(async (req) => {
     const needMtd = mtdStart !== startDate;
 
     // ── Fetch the exact-match stats (mirrors buildEukaAutofillData) ──
-    let overview: any, creatorsResp: any, prodResp: any, mtdResp: any;
+    let overview: any, creatorsResp: any, prodResp: any, mtdResp: any, videosResp: any;
     // Sections Euka would not give us. These two calls are best-effort, but they
     // used to vanish into `.catch(() => null)`, so a rejected request left the
     // Top Creators and Product tables blank with nothing to say why -- twice now
@@ -267,7 +269,7 @@ Deno.serve(async (req) => {
     // returned in meta so the form can say so.
     const skipped: string[] = [];
     try {
-      [overview, creatorsResp, prodResp, mtdResp] = await Promise.all([
+      [overview, creatorsResp, prodResp, mtdResp, videosResp] = await Promise.all([
         eukaPost('/dashboard/performance-overview', { storeId, brandId: eukaBrandId, startDate, endDate }, key, budget, timings),
         // The /dashboard endpoints that take a posted-date window want it as
         // postedDateRange: {startDate, endDate}. The older {start, end} is
@@ -286,6 +288,10 @@ Deno.serve(async (req) => {
           ? eukaPost('/dashboard/performance-overview', { storeId, brandId: eukaBrandId, startDate: mtdStart, endDate }, key,
               budget, timings, 'performance-overview (MTD)').catch(() => null)
           : Promise.resolve(null),
+        // Top videos by revenue for the window (revenue = the video's GMV). Best-effort like
+        // creators/products, and named in `skipped` when Euka refuses it.
+        eukaPost('/dashboard/top-videos-by-revenue', { storeId, brandId: eukaBrandId, filter: { postedDateRange: { startDate, endDate } }, limit: 5 }, key, budget, timings)
+          .catch(() => { skipped.push('topVideos'); return null; }),
       ]);
     } catch (e) {
       // Out of time is its own failure and gets its own message: "Euka is slow
@@ -344,6 +350,22 @@ Deno.serve(async (req) => {
         newVideos: '', videosMtd: '', samplesApprovedWeek: '', samplesApprovedMtd: '', notes: '',
       }));
 
+    // Top 5 videos by revenue. Euka gives a video id, not a link; TikTok resolves
+    // /@handle/video/<id>. itemsSoldCount is the video's items sold (matches orders in Euka's own table).
+    const topVideos = (videosResp?.videos || [])
+      .filter((v: any) => v.creatorHandle && v.videoId)
+      .sort((a: any, b: any) => Number(b.revenue) - Number(a.revenue))
+      .slice(0, 5)
+      .map((v: any) => ({
+        creatorName: `@${v.creatorHandle}`,
+        videoLink: `https://www.tiktok.com/@${v.creatorHandle}/video/${v.videoId}`,
+        itemsSold: num(v.itemsSoldCount),
+        gmv: money(v.revenue),
+        views: num(v.viewsCount),
+        productClicks: num(v.productClicks),
+        notes: '',
+      }));
+
     const data = {
       overallPerformance: {
         gmv: money(overview.totalShopGMV),
@@ -356,6 +378,7 @@ Deno.serve(async (req) => {
       overallInsights: insightsHtml(overview, topCreators),
       topCreators: topCreators.length ? topCreators : undefined,
       productHighlights: productHighlights.length ? productHighlights : undefined,
+      topVideos: topVideos.length ? topVideos : undefined,
     };
 
     return json({
@@ -368,6 +391,7 @@ Deno.serve(async (req) => {
         mtdPeriod: { startDate: mtdStart, endDate },
         creatorCount: topCreators.length,
         productCount: productHighlights.length,
+        videoCount: topVideos.length,
         // Sections Euka would not return (empty on a clean run).
         skipped,
         // Returned even on success: a run that took 70 of its 90 seconds is
