@@ -132,5 +132,7 @@ export function mergeAutofill(current, partial) {
   else next.topCreators = current.topCreators;
   if (partial.productHighlights && partial.productHighlights.length) next.productHighlights = partial.productHighlights;
   else next.productHighlights = current.productHighlights;
+  if (partial.topVideos && partial.topVideos.length) next.topVideos = partial.topVideos;
+  else next.topVideos = current.topVideos;
   return next;
 }
