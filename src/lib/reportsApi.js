@@ -591,9 +591,35 @@ export async function reopenReport(id, { target = 'verified', note }) {
 // Both go through gated SECURITY DEFINER RPCs (the reports UPDATE RLS is too broad
 // to guard a single star column). Half-stars (0.5) allowed.
 // --------------------------------------------------------------
-export async function rateApcReport(reportId, stars) {
-  const { error } = await supabase.rpc('report_rate_apc', { p_report_id: reportId, p_stars: Number(stars) });
+// `note` is the TL's optional feedback for the APC (mig 448). A null star = note-only save. A report
+// can be rated from the moment it is submitted, so the TL can rate while reading it.
+export async function rateApcReport(reportId, stars, note = null) {
+  const { error } = await supabase.rpc('report_rate_apc', {
+    p_report_id: reportId,
+    p_stars: stars == null ? null : Number(stars),
+    p_note: note ?? null,
+  });
   if (error) throw new Error(error.message);
+}
+
+// The TL's feedback on an APC's report — readable (RLS) only by that TL, OL/Boss and the report's
+// own author (mig 448). null when none / not permitted.
+export async function getReportApcNote(reportId) {
+  if (!reportId) return null;
+  const { data, error } = await supabase
+    .from('report_apc_stars_notes').select('note').eq('report_id', reportId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.note ?? null;
+}
+
+// Confirmation text for a Verify button: warns when the reviewer has not rated the report yet,
+// because that rating is what feeds the APC's score (an unrated report is a missed point).
+export function verifyConfirmText(base, report) {
+  return report && report.apc_stars == null
+    ? `${base}
+
+You haven't given this report a star rating yet. Rate it first (above the report) so no points are missed. Verify anyway?`
+    : base;
 }
 
 // `note` is an OPTIONAL justification the OL leaves for the TL (mig 309/310). A

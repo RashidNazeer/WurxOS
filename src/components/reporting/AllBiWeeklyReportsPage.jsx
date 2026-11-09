@@ -16,6 +16,7 @@ import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
+import { verifyConfirmText } from '../../lib/reportsApi';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import ClientMultiSelect from './ClientMultiSelect';
 import EditReportDatesModal from './EditReportDatesModal';
@@ -279,7 +280,7 @@ export default function AllBiWeeklyReportsPage() {
 
   /* ── OL acting as TL: verify a submitted report ───────────────────────── */
   const handleVerifyAsTl = async (report) => {
-    if (!(await ask(`Verify this report (${report.periodLabel}) on the TL's behalf? It will move to "verified" for OL approval.`))) return;
+    if (!(await ask(verifyConfirmText(`Verify this report (${report.periodLabel}) on the TL's behalf? It will move to "verified" for OL approval.`, report)))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'verified', {

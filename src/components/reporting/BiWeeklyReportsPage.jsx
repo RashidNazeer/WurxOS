@@ -11,6 +11,7 @@ import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctC
 import BiWeeklyReportForm from './BiWeeklyReportForm';
 import WeeklyReportView from './WeeklyReportView';
 import ReportRatingBar from './ReportRatingBar';
+import { verifyConfirmText } from '../../lib/reportsApi';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
 import { deductPromptApcReport } from '../../lib/apcReportingApi';
 import { useDialogs } from '../common/useDialogs';
@@ -241,7 +242,7 @@ export default function BiWeeklyReportsPage() {
   };
 
   const handleVerify = async (report) => {
-    if (!(await ask(`Verify this bi-weekly report (${report.periodLabel})? It will be sent to the Operation Lead for approval.`))) return;
+    if (!(await ask(verifyConfirmText(`Verify this bi-weekly report (${report.periodLabel})? It will be sent to the Operation Lead for approval.`, report)))) return;
     try {
       const senderName = currentUser.displayName || 'TL';
       await updateReportStatus(report.id, 'verified', {

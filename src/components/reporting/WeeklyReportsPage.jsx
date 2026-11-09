@@ -13,6 +13,7 @@ import WeeklyReportForm from './WeeklyReportForm';
 import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
+import { verifyConfirmText } from '../../lib/reportsApi';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
 import { useDialogs } from '../common/useDialogs';
 import { pktToday, currentReportableWeek as currentReportableWeekFor } from '../../lib/reportDue';
@@ -266,7 +267,7 @@ export default function WeeklyReportsPage() {
   };
 
   const handleVerify = async (report) => {
-    if (!(await ask(`Verify this report (${report.weekLabel})? It will be sent to the Operation Lead for approval.`))) return;
+    if (!(await ask(verifyConfirmText(`Verify this report (${report.weekLabel})? It will be sent to the Operation Lead for approval.`, report)))) return;
     try {
       const senderName = currentUser.displayName || 'TL';
       await updateReportStatus(report.id, 'verified', {

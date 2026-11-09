@@ -22,7 +22,7 @@ import ClientMultiSelect from './ClientMultiSelect';
 import ToolbarSelect from './ToolbarSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
-import { remindReports } from '../../lib/reportsApi';
+import { remindReports, verifyConfirmText } from '../../lib/reportsApi';
 import { useDialogs } from '../common/useDialogs';
 
 function StatusBadge({ status, style }) {
@@ -461,7 +461,7 @@ export default function AllWeeklyReportsPage() {
 
   /* ── OL acting as TL: verify a submitted report ───────────────────────── */
   const handleVerifyAsTl = async (report) => {
-    if (!(await ask(`Verify this report (${report.weekLabel}) on the TL's behalf? It will move to "verified" for OL approval.`))) return;
+    if (!(await ask(verifyConfirmText(`Verify this report (${report.weekLabel}) on the TL's behalf? It will move to "verified" for OL approval.`, report)))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'verified', {
