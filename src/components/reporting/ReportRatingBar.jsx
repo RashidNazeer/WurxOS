@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { rateApcReport, rateTlReport, getReportTlNote } from '../../lib/reportsApi';
+import { rateApcReport, rateTlReport, getReportTlNote, getReportApcNote } from '../../lib/reportsApi';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Half-star picker (0–5, 0.5 steps): left half of a star = x.5, right half = x.
 // Matches the agenda OngoingEvaluation StarRating look.
@@ -109,7 +110,11 @@ export default function ReportRatingBar({ report, viewerRole, isBrandOwner, onRa
   const isBoss = viewerRole === 'boss';
   const status = report?.status || 'draft';
   const rateable = status === 'verified' || status === 'approved';
-  const canRateApc = (isBrandOwner || isBoss) && rateable;
+  // The APC rating opens as soon as the report is submitted, so the TL can rate while reading it (mig 448).
+  const apcRateable = rateable || status === 'submitted';
+  const { user } = useAuth();
+  const isAuthor = !!user?.id && (report?.createdBy || report?.author_id) === user.id;
+  const canRateApc = (isBrandOwner || isBoss) && apcRateable;
   const showApcReadonly = !canRateApc && isAdmin && rateable;
   const canRateTl = isAdmin && rateable;
   const tlReadonlyBase = !isAdmin && isBrandOwner && rateable; // the receiving TL
@@ -117,7 +122,15 @@ export default function ReportRatingBar({ report, viewerRole, isBrandOwner, onRa
   // Fetch the OL's note only when this viewer is entitled to see it (OL/Boss, or
   // the brand-owner TL) — RLS also enforces it server-side.
   const [tlNote, setTlNote] = useState(null);
+  const [apcNote, setApcNote] = useState(null);
   const reportId = report?.id;
+  const wantsApcNote = !!reportId && (canRateApc || showApcReadonly || isAuthor);
+  useEffect(() => {
+    if (!wantsApcNote) { setApcNote(null); return undefined; }
+    let cancelled = false;
+    getReportApcNote(reportId).then((n) => { if (!cancelled) setApcNote(n); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [wantsApcNote, reportId]);
   const wantsNote = !!reportId && (canRateTl || tlReadonlyBase);
   useEffect(() => {
     if (!wantsNote) { setTlNote(null); return undefined; }
@@ -128,16 +141,25 @@ export default function ReportRatingBar({ report, viewerRole, isBrandOwner, onRa
 
   if (!report) return null;
   const showTlReadonly = tlReadonlyBase && (report.tl_stars != null || !!tlNote);
-  if (!canRateApc && !showApcReadonly && !canRateTl && !showTlReadonly) return null;
+  // The APC author sees the TL's star and feedback on their own report, read-only.
+  const showApcAuthor = isAuthor && !canRateApc && (report.apc_stars != null || !!apcNote);
+  if (!canRateApc && !showApcReadonly && !canRateTl && !showTlReadonly && !showApcAuthor) return null;
 
   return (
     <div className="d-flex flex-column gap-2 mt-2">
       {canRateApc && (
         <RatingRow
           label="Report quality (APC)"
-          hint="Your 0–5★ on this report feeds the APC's external-reporting score."
+          hint="Your 0–5★ feeds the APC's external-reporting score. Add feedback for the APC — they will see it."
           value={report.apc_stars}
-          onSave={async (v) => { await rateApcReport(report.id, v); onRated?.({ ...report, apc_stars: v }); }}
+          note={apcNote}
+          withNote
+          notePlaceholder="Feedback for the APC: what was good, what to improve…"
+          onSave={async (stars, note) => {
+            await rateApcReport(report.id, stars, note);
+            setApcNote((note || '').trim() || null);
+            onRated?.({ ...report, apc_stars: stars ?? report.apc_stars ?? null });
+          }}
         />
       )}
       {showApcReadonly && (
@@ -145,6 +167,16 @@ export default function ReportRatingBar({ report, viewerRole, isBrandOwner, onRa
           label="Report quality (APC)"
           hint="The Team Lead's rating of this report (feeds the APC's score) — view only."
           value={report.apc_stars}
+          note={apcNote}
+          readOnly
+        />
+      )}
+      {showApcAuthor && (
+        <RatingRow
+          label="Your Team Lead's rating"
+          hint="How your Team Lead rated this report (feeds your reporting score)."
+          value={report.apc_stars}
+          note={apcNote}
           readOnly
         />
       )}

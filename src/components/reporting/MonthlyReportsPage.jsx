@@ -10,6 +10,7 @@ import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import MonthlyReportForm from './MonthlyReportForm';
 import MonthlyReportView from './MonthlyReportView';
 import ReportRatingBar from './ReportRatingBar';
+import { verifyConfirmText } from '../../lib/reportsApi';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
 import { deductPromptApcReport } from '../../lib/apcReportingApi';
 import { useDialogs } from '../common/useDialogs';
@@ -104,7 +105,7 @@ export default function MonthlyReportsPage() {
 
   /* ── Status actions (TL verifies) ─────────────────────────────────────── */
   const handleVerify = async (report) => {
-    if (!(await ask(`Verify this report (${report.monthLabel}) and pass it to OL?`))) return;
+    if (!(await ask(verifyConfirmText(`Verify this report (${report.monthLabel}) and pass it to OL?`, report)))) return;
     const senderName = currentUser.displayName || 'Team Lead';
     try {
       await updateReportStatus(report.id, 'verified', {
