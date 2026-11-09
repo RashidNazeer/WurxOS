@@ -208,6 +208,51 @@ export async function apcPerfPreview(apcId, month) {
   };
 }
 
+// What is still missing for one APC's month (mig 444): weekly OL ratings for meetings
+// already held, and verified reports the TL has not starred. Null when not visible.
+export async function apcPerfPending(apcId, month) {
+  const { data, error } = await supabase.rpc('apc_perf_pending', { p_apc: apcId, p_month: month });
+  if (error) throw new Error(error.message);
+  const r = data?.[0];
+  return r ? { unratedMeetings: r.unrated_meetings, unstarredReports: r.unstarred_reports } : null;
+}
+
+// The same for every APC the caller manages → { apcId: { unratedMeetings, unstarredReports } }.
+// APCs with nothing missing are absent.
+export async function listApcPending(month) {
+  const { data, error } = await supabase.rpc('list_apc_pending', { p_month: month });
+  if (error) throw new Error(error.message);
+  const map = {};
+  for (const r of data || []) map[r.apc_id] = { unratedMeetings: r.unrated_meetings, unstarredReports: r.unstarred_reports };
+  return map;
+}
+
+// The reports that feed the APC's external-report score for a month: every report
+// verified in it, with the TL's star and any return dock. Docks are read separately
+// and tolerated if that table is not readable.
+export async function listApcReportsForMonth(apcId, month) {
+  const [y, m] = month.split('-').map(Number);
+  const startIso = `${month}-01T00:00:00+05:00`;
+  const next = new Date(Date.UTC(y, m, 1));
+  const endIso = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01T00:00:00+05:00`;
+  const { data, error } = await supabase
+    .from('reports')
+    .select('id, type, period_label, verified_at, apc_stars, brand:brand_id(brand_name)')
+    .eq('author_id', apcId)
+    .gte('verified_at', startIso).lt('verified_at', endIso)
+    .order('verified_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  const rows = data || [];
+  const docks = {};
+  if (rows.length) {
+    const { data: d } = await supabase
+      .from('apc_reporting_deductions').select('report_id, amount')
+      .eq('apc_id', apcId).eq('kind', 'report').in('report_id', rows.map((r) => r.id));
+    for (const x of d || []) docks[x.report_id] = (docks[x.report_id] || 0) + Number(x.amount);
+  }
+  return rows.map((r) => ({ ...r, dock: docks[r.id] || 0 }));
+}
+
 // The trial switch (read).
 export async function getWeeklyRatingsEnabled() {
   const { data, error } = await supabase

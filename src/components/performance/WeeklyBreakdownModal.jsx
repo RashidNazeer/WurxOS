@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom';
 import {
   listApcMeetingsForMonth, listWeeklyRatingsForApcMonth,
   averageWeeklyMetrics, weeklyOverall,
+  apcPerfPreview, apcPerfPending, listApcReportsForMonth,
 } from '../../lib/weeklyRatingsApi';
-import { getLevelTokens } from '../../lib/performanceApi';
+import { getLevelTokens, V1_PILLARS } from '../../lib/performanceApi';
 import { karachiYmd } from '../../lib/serverTime';
 import WeeklyRatingFields from './WeeklyRatingFields';
+import { PendingNotice } from './ApcPendingNotice';
 
 // The weekly CHECKPOINT breakdown for one APC in one month: each meeting (week)
 // with its score, expandable to the 4-slider rating for late / corrective entry.
@@ -18,10 +20,17 @@ function fmtDate(d) {
   return new Date(Date.UTC(y, m - 1, day)).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, initialMeetingId = null, onClose, onChanged }) {
+const pct = (n) => (n == null ? '—' : `${Math.round(Number(n))}/100`);
+
+// `pillars` ({performance, incentives, attendance, flags}), `composite` and `weights`
+// are the same numbers the card shows, so the modal can never disagree with it.
+export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, initialMeetingId = null, pillars = null, composite = null, weights = null, onClose, onChanged }) {
   const apcId = apc?.id;
   const [meetings, setMeetings] = useState([]);
   const [ratings, setRatings] = useState([]);
+  const [preview, setPreview] = useState(null);
+  const [pending, setPending] = useState(null);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [openId, setOpenId] = useState(null);
@@ -30,11 +39,14 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
   const load = useCallback(async () => {
     setLoading(true); setErr('');
     try {
-      const [mtgs, rts] = await Promise.all([
+      const [mtgs, rts, prev, pend, reps] = await Promise.all([
         listApcMeetingsForMonth(apcId, month),
         listWeeklyRatingsForApcMonth(apcId, month),
+        apcPerfPreview(apcId, month).catch(() => null),
+        apcPerfPending(apcId, month).catch(() => null),
+        listApcReportsForMonth(apcId, month).catch(() => []),
       ]);
-      setMeetings(mtgs); setRatings(rts);
+      setMeetings(mtgs); setRatings(rts); setPreview(prev); setPending(pend); setReports(reps);
     } catch (e) { setErr(e.message || String(e)); }
     finally { setLoading(false); }
   }, [apcId, month]);
@@ -78,6 +90,8 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
   // doesn't remount the open editor behind the "Loading weeks…" spinner.
   const onSaved = useCallback(() => {
     listWeeklyRatingsForApcMonth(apcId, month).then(setRatings).catch(() => {});
+    apcPerfPreview(apcId, month).then(setPreview).catch(() => {});
+    apcPerfPending(apcId, month).then(setPending).catch(() => {});
     onChanged?.();
   }, [apcId, month, onChanged]);
 
@@ -87,13 +101,49 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: '88vh', zIndex: 1, borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column' }}>
         <div className="d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
-            <div className="fw-bold" style={{ fontSize: '0.95rem' }}>Weekly performance — {apc?.displayName || apc?.userName || 'APC'}</div>
+            <div className="fw-bold" style={{ fontSize: '0.95rem' }}>Performance breakdown — {apc?.displayName || apc?.userName || 'APC'}</div>
             <div className="text-muted" style={{ fontSize: '0.72rem' }}>{month} · month score = average of the weeks</div>
           </div>
           <button className="btn btn-sm p-0 px-1" style={{ fontSize: '0.9rem', lineHeight: 1 }} onClick={onClose}>✕</button>
         </div>
 
         <div className="px-4 py-3" style={{ overflowY: 'auto', flexGrow: 1 }}>
+          <PendingNotice pending={pending} month={month} />
+
+          {pillars && (
+            <div className="rounded-3 px-3 py-2 mb-3" style={{ background: 'var(--surface-2)' }}>
+              <div className="d-flex align-items-center justify-content-between mb-1">
+                <span className="text-muted" style={{ fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall score</span>
+                <strong style={{ fontSize: '0.95rem' }}>{composite == null ? 'Not rated yet' : `${composite}/100`}</strong>
+              </div>
+              {V1_PILLARS.map((p) => (
+                <div key={p.key} className="d-flex justify-content-between" style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                  <span>{p.label}{weights?.[p.key] != null ? ` · ${weights[p.key]}%` : ''}</span>
+                  <strong>{pct(pillars[p.key])}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {preview && (
+            <div className="rounded-3 px-3 py-2 mb-3" style={{ border: '1px solid var(--border-subtle)', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+              <div className="text-muted mb-1" style={{ fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Performance pillar = 0.6 × checkpoint + 0.4 × external report
+              </div>
+              <div className="d-flex justify-content-between"><span>Checkpoint · OL weekly ratings (60%)</span><strong>{pct(preview.checkpoint)}</strong></div>
+              <div className="d-flex justify-content-between"><span>External report (40%) · {preview.n || 0} verified</span><strong>{pct(preview.report)}</strong></div>
+              <div className="d-flex justify-content-between text-muted ps-2" style={{ fontSize: '0.7rem' }}>
+                <span>· TL stars (60%){preview.starAvg == null ? '' : ` · ${Number(preview.starAvg).toFixed(1)}★ avg`}</span><span>{pct(preview.starScore)}</span>
+              </div>
+              <div className="d-flex justify-content-between text-muted ps-2" style={{ fontSize: '0.7rem' }}>
+                <span>· Accountability (40%) · {preview.deductions || 0} returned</span><span>{pct(preview.accountability)}</span>
+              </div>
+              <div className="d-flex justify-content-between pt-1 mt-1" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
+                <span className="fw-semibold">Performance pillar</span><strong>{pct(preview.blended)}</strong>
+              </div>
+            </div>
+          )}
+
           {/* Projected monthly */}
           <div className="d-flex align-items-center justify-content-between rounded-3 px-3 py-2 mb-3" style={{ background: 'var(--surface-2)' }}>
             <div>
@@ -176,6 +226,35 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {!loading && (
+            <div className="mt-3">
+              <div className="text-muted mb-1" style={{ fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Reports verified in {month} · TL stars
+              </div>
+              {reports.length === 0 ? (
+                <div className="text-muted small">No reports verified this month yet.</div>
+              ) : (
+                <div className="d-flex flex-column gap-1">
+                  {reports.map((r) => (
+                    <div key={r.id} className="d-flex align-items-center justify-content-between rounded-2 px-2 py-1" style={{ border: '1px solid var(--border-subtle)', fontSize: '0.74rem' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        <span className="fw-semibold" style={{ color: 'var(--text-primary)' }}>{r.brand?.brand_name || 'Brand'}</span>
+                        {' · '}{r.type}{r.period_label ? ` · ${r.period_label}` : ''}
+                        {r.dock > 0 && <span className="ms-2" style={{ color: 'var(--danger-text)' }}>returned ×{r.dock}</span>}
+                      </span>
+                      {r.apc_stars != null ? (
+                        <span style={{ color: 'var(--warning-text)', fontWeight: 700 }}>{Number(r.apc_stars).toFixed(1)} ★</span>
+                      ) : (
+                        <span className="rounded-pill px-2" style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: '0.64rem', fontWeight: 700 }}>TL star missing</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>The TL gives the star when verifying the report.</div>
             </div>
           )}
         </div>
