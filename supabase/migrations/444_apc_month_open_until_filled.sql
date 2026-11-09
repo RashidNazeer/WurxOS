@@ -222,3 +222,69 @@ grant execute on function public.perf_lock_month(text, boolean) to authenticated
 -- 2. tl_perf_preview: serve the frozen payload for a finalised month.
 -- The short-circuit sits AFTER the permission check, as in 424.
 -- ─────────────────────────────────────────────────────────────
+
+-- ── Daily nudge once a month has ended and an APC's performance is still incomplete ──
+-- Last month (Asia/Karachi) only, and only for APCs not yet finalised. Each OL gets one
+-- notice with the totals; each TL gets one for the unstarred reports of their own APCs.
+-- Reuses the 'agenda' category (like weekly_rating.pending) so no new prefs/UI entry is needed.
+create or replace function public.notify_incomplete_apc_performance()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_month text := to_char(date_trunc('month', now() at time zone 'Asia/Karachi') - interval '1 month', 'YYYY-MM');
+  v_label text := to_char(date_trunc('month', now() at time zone 'Asia/Karachi') - interval '1 month', 'FMMonth YYYY');
+  v_apcs int; v_rat int; v_star int;
+  r record;
+begin
+  create temporary table if not exists _apc_pend (apc_id uuid, tl_id uuid, rat int, star int) on commit drop;
+  delete from _apc_pend;
+  insert into _apc_pend
+  select a.id, a.reports_to, x.unrated_meetings, x.unstarred_reports
+    from public.profiles a
+    cross join lateral public.apc_perf_pending_raw(a.id, v_month) x
+   where a.role = 'apc' and a.is_active = true and a.deleted_at is null
+     and (x.unrated_meetings > 0 or x.unstarred_reports > 0)
+     and not exists (select 1 from public.performance_month_snapshots s
+                      where s.user_id = a.id and s.month = v_month);
+
+  select count(*), coalesce(sum(rat), 0), coalesce(sum(star), 0) into v_apcs, v_rat, v_star from _apc_pend;
+  if v_apcs = 0 then return; end if;
+
+  for r in select id from public.profiles where role = 'ol' and is_active = true and deleted_at is null loop
+    perform public.emit_notification(
+      r.id, null, 'agenda', 'perf_month.incomplete',
+      v_label || ' performance is incomplete',
+      v_apcs || ' APC' || case when v_apcs = 1 then '' else 's' end || ' not finalised: '
+        || v_rat || ' weekly rating' || case when v_rat = 1 then '' else 's' end || ' to fill, '
+        || v_star || ' report' || case when v_star = 1 then '' else 's' end || ' to star.',
+      'performance_month', null, '/performance');
+  end loop;
+
+  for r in select tl_id, count(*) as apcs, sum(star) as stars
+             from _apc_pend where star > 0 and tl_id is not null group by tl_id loop
+    if exists (select 1 from public.profiles p where p.id = r.tl_id and p.role in ('tl','pctl') and p.is_active = true and p.deleted_at is null) then
+      perform public.emit_notification(
+        r.tl_id, null, 'agenda', 'perf_month.incomplete',
+        v_label || ' performance is incomplete',
+        r.stars || ' verified report' || case when r.stars = 1 then '' else 's' end
+          || ' from ' || r.apcs || ' of your APC' || case when r.apcs = 1 then '' else 's' end
+          || ' still need a star before the month can be finalised.',
+        'performance_month', null, '/performance');
+    end if;
+  end loop;
+end;
+$fn$;
+revoke all on function public.notify_incomplete_apc_performance() from public, anon, authenticated;
+grant execute on function public.notify_incomplete_apc_performance() to service_role;
+
+-- 04:00 UTC = 09:00 Asia/Karachi, every day. Stops by itself once everything is filled.
+do $sched$
+begin
+  if exists (select 1 from cron.job where jobname = 'perf-incomplete-nudge') then
+    perform cron.unschedule('perf-incomplete-nudge');
+  end if;
+  perform cron.schedule('perf-incomplete-nudge', '0 4 * * *', $job$ select public.notify_incomplete_apc_performance(); $job$);
+end $sched$;
