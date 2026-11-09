@@ -98,3 +98,22 @@ export function monthLabel(month) {
   return new Date(Date.UTC(y, m - 1, 1))
     .toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
 }
+
+// The caller's own chance of APC / TL of the Month (mig 445). `incPct` is an optional
+// what-if: the share of incentive goals completed (0-100). Null when the caller is not an
+// APC/TL or the month is in the future.
+export async function getAchievementOdds(month, incPct = null) {
+  const { data, error } = await supabase.rpc('achievement_odds', {
+    p_month: month, p_inc_pct: incPct == null ? null : incPct,
+  });
+  if (error) throw new Error(error.message);
+  const r = data?.[0];
+  if (!r) return null;
+  return {
+    pool: r.pool, eligible: r.eligible, reason: r.reason,
+    score: r.score == null ? null : Number(r.score),
+    probability: r.probability == null ? null : Number(r.probability),
+    rank: r.rank, poolSize: r.pool_size, provisional: r.provisional,
+    focusPillar: r.focus_pillar, focusGap: r.focus_gap == null ? null : Number(r.focus_gap),
+  };
+}

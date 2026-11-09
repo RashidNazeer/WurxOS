@@ -24,6 +24,7 @@ import {
   listApcReporting, apcPerfPreview, listApcPending, apcPerfPending,
 } from '../../lib/weeklyRatingsApi';
 import { PendingBadge } from './ApcPendingNotice';
+import AchievementOddsCard from './AchievementOddsCard';
 import {
   getTlPerfEnabled, setTlPerfEnabled, listTlReporting, tlPerfPreview,
 } from '../../lib/tlPerfApi';
@@ -1882,6 +1883,15 @@ export default function PerformancePage() {
                 {myRecord?.evaluatedByName && <p className="text-muted" style={{ fontSize: '0.68rem' }}>Performance rated by {myRecord.evaluatedByName}</p>}
               </div>
             </div>
+          )}
+
+          {(effectiveRole === 'apc' || effectiveRole === 'tl') && (
+            <AchievementOddsCard
+              month={month}
+              role={effectiveRole}
+              goalsTotal={(myIncRecord?.incentives?.length || 0) + (myIncRecord?.bonuses?.length || 0)}
+              goalsDone={[...(myIncRecord?.incentives || []), ...(myIncRecord?.bonuses || [])].filter((i) => i.completed).length}
+            />
           )}
 
           {effectiveRole === 'apc' && (
