@@ -8,14 +8,17 @@ const PILLAR_LABEL = { performance: 'Performance', incentives: 'Incentives', att
 // APCs can also slide how many incentive goals they complete to see the effect.
 export default function AchievementOddsCard({ month, role, goalsTotal = 0, goalsDone = 0 }) {
   const [base, setBase] = useState(undefined);
+  const [loadErr, setLoadErr] = useState('');
   const [what, setWhat] = useState(null);
   const [n, setN] = useState(goalsDone);
   useEffect(() => { setN(goalsDone); }, [goalsDone, month]);
 
   useEffect(() => {
     let off = false;
-    setBase(undefined);
-    getAchievementOdds(month).then((r) => { if (!off) setBase(r); }).catch(() => { if (!off) setBase(null); });
+    setBase(undefined); setLoadErr('');
+    getAchievementOdds(month)
+      .then((r) => { if (!off) setBase(r); })
+      .catch((e) => { if (!off) { setBase(null); setLoadErr(e.message || String(e)); } });
     return () => { off = true; };
   }, [month]);
 
@@ -30,7 +33,22 @@ export default function AchievementOddsCard({ month, role, goalsTotal = 0, goals
     return () => { off = true; clearTimeout(t); };
   }, [changed, n, goalsTotal, month]);
 
-  if (!base) return null;
+  if (base === undefined) {
+    return (
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)' }}>
+        <div className="card-body p-3 text-muted small"><span className="spinner-border spinner-border-sm me-2" />Calculating your chance of {role === 'tl' ? 'TL' : 'APC'} of the Month…</div>
+      </div>
+    );
+  }
+  if (!base) {
+    return loadErr ? (
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)' }}>
+        <div className="card-body p-3 small" style={{ color: 'var(--danger-text)' }}>
+          <i className="bi bi-exclamation-triangle me-1" />Couldn't load your chance of {role === 'tl' ? 'TL' : 'APC'} of the Month: {loadErr}
+        </div>
+      </div>
+    ) : null;
+  }
   const title = base.pool === 'tl' ? 'TL of the Month' : 'APC of the Month';
   const shown = changed && what?.probability != null ? what : base;
 
