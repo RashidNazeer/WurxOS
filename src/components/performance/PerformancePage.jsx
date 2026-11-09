@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -21,8 +21,9 @@ import {
 } from '../../lib/performanceApi';
 import {
   listPendingApcRatings, getWeeklyRatingsEnabled, setWeeklyRatingsEnabled,
-  listApcReporting, apcPerfPreview,
+  listApcReporting, apcPerfPreview, listApcPending, apcPerfPending,
 } from '../../lib/weeklyRatingsApi';
+import { PendingBadge } from './ApcPendingNotice';
 import {
   getTlPerfEnabled, setTlPerfEnabled, listTlReporting, tlPerfPreview,
 } from '../../lib/tlPerfApi';
@@ -1248,6 +1249,20 @@ export default function PerformancePage() {
     return () => { cancelled = true; };
   }, [effectiveRole, month]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // What each APC's month is still waiting on (mig 444): OL weekly ratings and TL report
+  // stars. Managers get the whole team in one call; an APC gets their own.
+  const [apcPending, setApcPending] = useState({});
+  const [myPending, setMyPending] = useState(null);
+  const [selfBreakdownOpen, setSelfBreakdownOpen] = useState(false);
+  const refreshApcPending = useCallback(() => {
+    if (isBoss || ['ol', 'tl', 'pctl'].includes(effectiveRole)) {
+      listApcPending(month).then((m) => setApcPending(m || {})).catch(() => setApcPending({}));
+    } else if (effectiveRole === 'apc' && currentUser?.uid) {
+      apcPerfPending(currentUser.uid, month).then(setMyPending).catch(() => setMyPending(null));
+    }
+  }, [month, isBoss, effectiveRole, currentUser?.uid]);
+  useEffect(() => { refreshApcPending(); }, [refreshApcPending]);
+
   // ── Load ──
   useEffect(() => {
     // Stale-response guard: on a flaky connection a month switch can let the
@@ -1607,6 +1622,7 @@ export default function PerformancePage() {
     if (isBoss || effectiveRole === 'ol') {
       try { setPendingRatings(await listPendingApcRatings(month)); } catch { /* ignore */ }
     }
+    refreshApcPending();
   }
   async function toggleWeeklySwitch(next) {
     if (!isBoss || switchBusy) return;
@@ -1868,6 +1884,17 @@ export default function PerformancePage() {
             </div>
           )}
 
+          {effectiveRole === 'apc' && (
+            <div className="mb-4">
+              {!mySnap && <PendingBadge pending={myPending} />}
+              <button type="button" className="btn btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2"
+                style={{ background: 'var(--surface-1)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', padding: '9px 14px' }}
+                onClick={() => setSelfBreakdownOpen(true)}>
+                <i className="bi bi-bar-chart-fill" /> View my full performance breakdown
+              </button>
+            </div>
+          )}
+
           {/* Private what-if tool — see exactly how the score is built and
               simulate reaching a goal. Read-only; never touches real data. */}
           <Link to="/performance/simulator"
@@ -2126,6 +2153,8 @@ export default function PerformancePage() {
                           )}
                         </div>
 
+                        {(u.role || u.userRole) === 'apc' && !snapshots[u.id] && <PendingBadge pending={apcPending[u.id]} />}
+
                         {/* Actions */}
                         <div className="d-flex gap-2 mt-auto">
                           {(u.role || u.userRole) === 'apc' ? (
@@ -2135,7 +2164,7 @@ export default function PerformancePage() {
                               style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                               onClick={() => { setWeeklyInitMeeting(null); setWeeklyTarget(u); }}
                               title="Weekly performance ratings">
-                              <i className="bi bi-bar-chart-fill" /> Weekly
+                              <i className="bi bi-bar-chart-fill" /> Breakdown
                             </button>
                           ) : (u.role || u.userRole) === 'tl' ? (
                             // TLs: team + reporting breakdown. During Trial it's a preview and the
@@ -2188,15 +2217,33 @@ export default function PerformancePage() {
 
       {/* Modals */}
       {rateTarget && <RateModal user={rateTarget} existing={teamRecords[rateTarget.id]} month={month} onClose={() => setRateTarget(null)} onSaved={handleRateSaved} />}
-      {weeklyTarget && (
+      {weeklyTarget && (() => {
+        const card = filteredTeam.find((c) => c.id === weeklyTarget.id) || weeklyTarget;
+        return (
+          <WeeklyBreakdownModal
+            apc={weeklyTarget}
+            month={month}
+            enabled={weeklyCfg.enabled}
+            canWrite={isBoss || effectiveRole === 'ol'}
+            initialMeetingId={weeklyInitMeeting}
+            pillars={card.pillarScores || null}
+            composite={card.composite ?? null}
+            weights={weights}
+            onClose={() => { setWeeklyTarget(null); setWeeklyInitMeeting(null); }}
+            onChanged={() => handleWeeklyChanged(weeklyTarget.id)}
+          />
+        );
+      })()}
+      {selfBreakdownOpen && (
         <WeeklyBreakdownModal
-          apc={weeklyTarget}
+          apc={{ id: currentUser.uid, displayName: currentUser.displayName }}
           month={month}
           enabled={weeklyCfg.enabled}
-          canWrite={isBoss || effectiveRole === 'ol'}
-          initialMeetingId={weeklyInitMeeting}
-          onClose={() => { setWeeklyTarget(null); setWeeklyInitMeeting(null); }}
-          onChanged={() => handleWeeklyChanged(weeklyTarget.id)}
+          canWrite={false}
+          pillars={myPillarScores}
+          composite={myComposite}
+          weights={weights}
+          onClose={() => setSelfBreakdownOpen(false)}
         />
       )}
       {tlTarget && (
