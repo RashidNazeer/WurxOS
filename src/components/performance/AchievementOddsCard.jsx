@@ -35,10 +35,10 @@ export default function AchievementOddsCard({ month, role, goalsTotal = 0, goals
   const shown = changed && what?.probability != null ? what : base;
 
   return (
-    <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)' }}>
-      <div className="card-body p-3">
+    <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)', border: '1px solid color-mix(in srgb, var(--accent) 45%, transparent)', background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--surface-1)), var(--surface-1))' }}>
+      <div className="card-body p-4">
         <div className="d-flex align-items-center justify-content-between mb-1">
-          <span className="fw-bold" style={{ fontSize: '0.85rem' }}><i className="bi bi-trophy-fill me-1" style={{ color: 'var(--warning)' }} />Your chance of {title}</span>
+          <span className="fw-bold" style={{ fontSize: '1rem' }}><i className="bi bi-trophy-fill me-2" style={{ color: 'var(--warning)', fontSize: '1.2rem' }} />Your chance of becoming {title}</span>
           <span className="text-muted" style={{ fontSize: '0.62rem' }}>estimate</span>
         </div>
         {!base.eligible ? (
@@ -46,7 +46,7 @@ export default function AchievementOddsCard({ month, role, goalsTotal = 0, goals
         ) : (
           <>
             <div className="d-flex align-items-baseline gap-2">
-              <span className="fw-bold" style={{ fontSize: '1.9rem', color: 'var(--accent)' }}>{shown.probability}%</span>
+              <span className="fw-bold" style={{ fontSize: '3rem', lineHeight: 1, color: 'var(--accent)' }}>{shown.probability}%</span>
               <span className="text-muted small">
                 rank {shown.rank} of {shown.poolSize} · projected score {shown.score}
               </span>
