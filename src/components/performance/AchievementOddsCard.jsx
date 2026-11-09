@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getAchievementOdds } from '../../lib/achievementsApi';
+import { karachiYmd } from '../../lib/serverTime';
 
 const PILLAR_LABEL = { performance: 'Performance', incentives: 'Incentives', attendance: 'Attendance', flags: 'Flags' };
 
@@ -50,6 +52,9 @@ export default function AchievementOddsCard({ month, role, goalsTotal = 0, goals
     ) : null;
   }
   const title = base.pool === 'tl' ? 'TL of the Month' : 'APC of the Month';
+  // The estimate is only exact once the incentive goals are filled in and verified, so ask for the
+  // progress so far. Current month only; a finished month is already settled.
+  const needsGoals = month === karachiYmd().slice(0, 7) && (goalsTotal === 0 || base.provisional);
   const shown = changed && what?.probability != null ? what : base;
 
   return (
@@ -94,6 +99,17 @@ export default function AchievementOddsCard({ month, role, goalsTotal = 0, goals
               </div>
             )}
           </>
+        )}
+        {needsGoals && (
+          <div className="rounded-2 mt-2 px-2 py-2 d-flex align-items-center justify-content-between gap-2 flex-wrap"
+            style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: '0.74rem', fontWeight: 600 }}>
+            <span><i className="bi bi-pencil-square me-1" />
+              {goalsTotal === 0
+                ? 'Add your incentive goals for this month, so your chance can be exact.'
+                : `Update the incentive goals you've completed so far (${goalsDone} of ${goalsTotal}) to make this chance exact.`}
+            </span>
+            <Link to="/incentives" className="btn btn-sm" style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', fontSize: '0.7rem' }}>Update incentives</Link>
+          </div>
         )}
         <div className="text-muted mt-1" style={{ fontSize: '0.62rem' }}>
           Based on this month so far and your last 3 finalised months. The Boss or OL makes the final choice.
