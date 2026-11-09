@@ -56,6 +56,9 @@ export const INCENTIVE_OPTIONS = [
   {
     key: 'videos_100_gmv',
     label: 'Videos with $100+ GMV',
+    // Retired: no longer offered for new plans. Kept in the list so lines already on past plans
+    // still read their targets and achieved figures.
+    retired: true,
     section: 'incentives',
     rowAliases: ['videos with $100+ gmv'],
     unit: 'count',
@@ -76,6 +79,8 @@ export const INCENTIVE_OPTIONS = [
   },
 ];
 
+// What the picker offers: everything not retired.
+export const ACTIVE_INCENTIVE_OPTIONS = INCENTIVE_OPTIONS.filter((o) => !o.retired);
 export const OPTION_BY_KEY = Object.fromEntries(INCENTIVE_OPTIONS.map((o) => [o.key, o]));
 
 // The PKR amount a line gets when it is added from the workbook. The OL can still change it

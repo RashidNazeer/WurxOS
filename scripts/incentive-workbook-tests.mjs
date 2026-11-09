@@ -178,6 +178,11 @@ t('a month the sheet cannot answer is unavailable, not a neighbour', () => {
   assert.ok(r.unavailable, 'should refuse');
   assert.equal(r.value, undefined);
 });
+t('videos_100_gmv is retired: kept for history, never offered by the picker', () => {
+  assert.ok(M.OPTION_BY_KEY.videos_100_gmv, 'still readable for past plans');
+  assert.ok(!M.ACTIVE_INCENTIVE_OPTIONS.some((o) => o.key === 'videos_100_gmv'));
+  assert.equal(M.ACTIVE_INCENTIVE_OPTIONS.length, 4);
+});
 t('the five options split 3 incentives / 2 bonuses', () => {
   assert.equal(M.INCENTIVE_OPTIONS.filter((o) => o.section === 'incentives').length, 3);
   assert.equal(M.INCENTIVE_OPTIONS.filter((o) => o.section === 'bonuses').length, 2);

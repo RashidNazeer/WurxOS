@@ -18,7 +18,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  INCENTIVE_OPTIONS,
+  INCENTIVE_OPTIONS, ACTIVE_INCENTIVE_OPTIONS,
   getTarget, formatTarget, availableMonths, buildSelectionChanges,
 } from '../../lib/incentiveWorkbook';
 import { canon, fetchWorkbookBuffer, parseWorkbookForBrands } from '../../lib/incentiveWorkbookLoad';
@@ -189,7 +189,7 @@ export default function WorkbookIncentivesModal({
 
   const brandRows = brands.map((b) => {
     const sheet = sheets?.[b.id];
-    const opts = INCENTIVE_OPTIONS.map((o) => {
+    const opts = ACTIVE_INCENTIVE_OPTIONS.map((o) => {
       const res = sheet && !sheet.missing ? getTarget(sheet, o.key, month) : null;
       return { ...o, res, selected: picked.has(selKey(b.id, o.key)), existing: already.get(selKey(b.id, o.key)) || null };
     });
