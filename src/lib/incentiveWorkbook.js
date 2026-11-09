@@ -77,7 +77,6 @@ export const INCENTIVE_OPTIONS = [
 ];
 
 export const OPTION_BY_KEY = Object.fromEntries(INCENTIVE_OPTIONS.map((o) => [o.key, o]));
-export const MAX_SELECTIONS_PER_APC = 5;
 
 // The PKR amount a line gets when it is added from the workbook. The OL can still change it
 // on the plan; a line that already exists keeps whatever amount it has.

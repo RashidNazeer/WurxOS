@@ -6,7 +6,6 @@ import {
   getIncentivesTemplate, setIncentivesTemplate, fetchBrandCommissionAllocations,
 } from '../../lib/incentivesApi';
 import { listBrandMetricsForMonth } from '../../lib/brandMetricsApi';
-import { MAX_SELECTIONS_PER_APC } from '../../lib/incentiveWorkbook';
 import WorkbookIncentivesModal from './WorkbookIncentivesModal';
 import { currencySymbol } from '../../utils/currencies';
 import { formatMoney, formatPKR } from '../../lib/format';
@@ -975,9 +974,6 @@ export default function IncentiveForm() {
             <button type="button" className="wx-btn wx-btn-ghost" onClick={() => setWbOpen(true)}>
               <i className="bi bi-journal-arrow-down me-1" /> Add from brand workbook
             </button>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              Up to {MAX_SELECTIONS_PER_APC} options across all {brands.length} brand{brands.length === 1 ? '' : 's'} combined.
-            </span>
           </div>
         )}
 

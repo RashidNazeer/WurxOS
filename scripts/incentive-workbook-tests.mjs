@@ -181,7 +181,7 @@ t('a month the sheet cannot answer is unavailable, not a neighbour', () => {
 t('the five options split 3 incentives / 2 bonuses', () => {
   assert.equal(M.INCENTIVE_OPTIONS.filter((o) => o.section === 'incentives').length, 3);
   assert.equal(M.INCENTIVE_OPTIONS.filter((o) => o.section === 'bonuses').length, 2);
-  assert.equal(M.MAX_SELECTIONS_PER_APC, 5);
+  assert.equal(M.MAX_SELECTIONS_PER_APC, undefined, 'no cap on options per APC');
 });
 
 // ── turning ticked options into plan lines ─────────────────────────

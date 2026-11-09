@@ -5,9 +5,8 @@
 // for each is read out of that brand's sheet and the ticked options become
 // brand-linked lines on the plan.
 //
-// FIVE PER APC, across every brand combined -- not five per brand. The counter
-// is on screen at all times and unticked boxes disable once five are reached,
-// so the limit is visible before it is hit rather than explained afterwards.
+// No cap on how many options an APC can hold (it used to be five, mig 422; lifted in mig 449).
+// The counter just shows how many are ticked.
 //
 // Targets only. The amount in PKR stays the OL's to type, and the achieved
 // figure keeps coming from where it already comes from: the APC's clock-in
@@ -19,7 +18,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  INCENTIVE_OPTIONS, MAX_SELECTIONS_PER_APC,
+  INCENTIVE_OPTIONS,
   getTarget, formatTarget, availableMonths, buildSelectionChanges,
 } from '../../lib/incentiveWorkbook';
 import { canon, fetchWorkbookBuffer, parseWorkbookForBrands } from '../../lib/incentiveWorkbookLoad';
@@ -74,7 +73,6 @@ export default function WorkbookIncentivesModal({
 
   const already = useMemo(() => existingSelections(incentives, bonuses), [incentives, bonuses]);
   const count = picked.size;
-  const atLimit = count >= MAX_SELECTIONS_PER_APC;
 
   useEffect(() => { if (brands.length === 1) setOpen(brands[0].id); }, [brands]);
 
@@ -145,7 +143,7 @@ export default function WorkbookIncentivesModal({
     setPicked((prev) => {
       const next = new Set(prev);
       if (next.has(k)) next.delete(k);
-      else if (next.size < MAX_SELECTIONS_PER_APC) next.add(k);
+      else next.add(k);
       return next;
     });
   }
@@ -154,7 +152,6 @@ export default function WorkbookIncentivesModal({
     setPicked((prev) => {
       const next = new Set(prev);
       for (const k of keys) {
-        if (next.size >= MAX_SELECTIONS_PER_APC) break;
         next.add(selKey(brandId, k));
       }
       return next;
@@ -212,9 +209,8 @@ export default function WorkbookIncentivesModal({
           </div>
           <span style={{
             padding: '5px 12px', borderRadius: 'var(--radius-pill)', fontSize: 12.5, fontWeight: 700,
-            background: atLimit ? 'var(--warning-soft, rgba(217,119,6,.15))' : 'var(--surface-2)',
-            color: atLimit ? 'var(--warning-text, #92400e)' : 'var(--text-muted)',
-          }}>{count} of {MAX_SELECTIONS_PER_APC} selected</span>
+            background: 'var(--surface-2)', color: 'var(--text-muted)',
+          }}>{count} selected</span>
           <button type="button" onClick={onClose} aria-label="Close" className="wx-btn wx-btn-ghost" style={{ padding: '6px 10px' }}>
             <i className="bi bi-x-lg" />
           </button>
@@ -318,7 +314,7 @@ export default function WorkbookIncentivesModal({
                                 // An option with no target would save an empty
                                 // targetValue, which pays nothing and reads as
                                 // a half-built line. Nothing to tick.
-                                const blocked = (!o.selected && atLimit) || value === undefined;
+                                const blocked = value === undefined;
                                 return (
                                   <label key={o.key}
                                     style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '6px 0', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.5 : 1 }}>
@@ -339,7 +335,6 @@ export default function WorkbookIncentivesModal({
                                 );
                               })}
                               <button type="button" className="wx-btn wx-btn-ghost" style={{ marginTop: 6, fontSize: 12 }}
-                                disabled={atLimit}
                                 onClick={() => selectAllForBrand(brand.id, opts.filter((o) => o.res?.value !== undefined).map((o) => o.key))}>
                                 Select all available
                               </button>
@@ -357,13 +352,6 @@ export default function WorkbookIncentivesModal({
                 })}
               </div>
 
-              {atLimit && (
-                <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--warning-soft, rgba(217,119,6,.12))', fontSize: 12.5, color: 'var(--text-primary)' }}>
-                  <i className="bi bi-info-circle me-1" />
-                  This APC has all {MAX_SELECTIONS_PER_APC} selections in use, across every brand combined.
-                  Untick one to choose a different option.
-                </div>
-              )}
             </section>
           )}
         </div>
