@@ -5,8 +5,8 @@ import { karachiYmd } from '../../lib/serverTime';
 
 const PILLAR_LABEL = { performance: 'Performance', incentives: 'Incentives', attendance: 'Attendance', flags: 'Flags' };
 
-// "Your chance of APC / TL of the Month". An estimate from the month so far and the last three
-// finalised months, not a promise: the Boss or an OL makes the final call (mig 445).
+// "Your chance of APC / TL of the Month". An estimate from this month only,
+// not a promise: the Boss or an OL makes the final call (mig 445).
 // APCs can also slide how many incentive goals they complete to see the effect.
 export default function AchievementOddsCard({ month, role, goalsTotal = 0, goalsDone = 0 }) {
   const [base, setBase] = useState(undefined);
@@ -112,7 +112,7 @@ export default function AchievementOddsCard({ month, role, goalsTotal = 0, goals
           </div>
         )}
         <div className="text-muted mt-1" style={{ fontSize: '0.62rem' }}>
-          Based on this month so far and your last 3 finalised months. The Boss or OL makes the final choice.
+          Based on this month only. The Boss or OL makes the final choice.
         </div>
       </div>
     </div>
