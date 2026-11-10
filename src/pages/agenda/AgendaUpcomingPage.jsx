@@ -7,6 +7,7 @@ import {
   getMyGuestTeams, listAgendaGuestTeams, setMeetingGuests, isGuestOf,
 } from '../../lib/agendaApi';
 import { useNow } from '../../hooks/useNow';
+import { useMyTeamLeadIds } from '../../lib/useMyTeamLeadIds';
 import { useDialogs } from '../../components/common/useDialogs';
 
 // Weekly Agenda Meetings — Upcoming. A month grid of week cards;
@@ -56,9 +57,9 @@ export default function AgendaUpcomingPage() {
   const [myGuestSlugs, setMyGuestSlugs] = useState([]);
   const [guestTeams, setGuestTeams]     = useState([]);   // [{ slug, label }]
   const isGuest = myGuestSlugs.length > 0;
-  const myTeamTlId = isOL
-    ? null
-    : (isTL ? user?.id : (isApc ? (profile?.reports_to || null) : null));
+  // Every team the viewer belongs to: a TL's own, or all of an APC's (mig 428: reports_to + brand owners).
+  const apcTlIds = useMyTeamLeadIds(user?.id, isApc, profile?.reports_to);
+  const myTeamTlIds = isOL ? [] : (isTL ? [user?.id] : apcTlIds);
 
   const [meetings, setMeetings]   = useState([]);
   const [teams, setTeams]         = useState([]);
@@ -283,7 +284,7 @@ export default function AgendaUpcomingPage() {
                 isGuest={isGuest}
                 myGuestSlugs={myGuestSlugs}
                 guestLabels={guestLabels}
-                myTeamTlId={myTeamTlId}
+                myTeamTlIds={myTeamTlIds}
                 today={today}
                 now={now}
                 busyId={busyId}
@@ -379,7 +380,7 @@ function GuestEditModal({ meeting, teams, tlName, onClose, onSave }) {
 }
 
 // ── Week card ───────────────────────────────────────────────────────────
-function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, today, now, busyId, notifying, notifyingTl, onStart, onOpen, onEditGuests, onNotifyTeam }) {
+function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlIds, today, now, busyId, notifying, notifyingTl, onStart, onOpen, onEditGuests, onNotifyTeam }) {
   const { ask, notify } = useDialogs();
   // Who sees which rows. An OL sees every team. Everyone else sees the UNION
   // of their own team and the teams they were invited to sit in on — so a TL
@@ -398,7 +399,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
 
   const rows = isOL
     ? card.rows
-    : card.rows.filter((r) => (myTeamTlId && r.tlId === myTeamTlId) || (isGuest && guestSees(r)));
+    : card.rows.filter((r) => (myTeamTlIds.includes(r.tlId)) || (isGuest && guestSees(r)));
 
   // The week reads "done" only when EVERY configured team is notified AND
   // completed. Basing this on all rows (not just notified ones) means a partial
@@ -469,7 +470,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
           {rows.length === 0 ? (
             <div className="text-muted small" style={{ fontSize: '0.74rem' }}>
               {isOL ? 'No teams scheduled.'
-                : myTeamTlId ? 'No meeting scheduled for your team.'
+                : myTeamTlIds.length ? 'No meeting scheduled for your team.'
                 : isGuest ? 'You’re not attending a meeting this week.'
                 : 'Nothing scheduled for you.'}
             </div>

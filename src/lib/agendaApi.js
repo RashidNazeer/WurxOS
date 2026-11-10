@@ -317,21 +317,39 @@ export function formatAgendaResetHint(schedule) {
 // Teams + meeting schedules (phase 2)
 // --------------------------------------------------------------
 
-// All active TL-teams with the APCs reporting to each.
+// All active TL-teams with their APCs. An APC belongs to every team of apc_team_leads (mig 428): their
+// reports_to PLUS the owner of each brand they hold, so one working across two TLs sits in both meetings.
 export async function listAgendaTeams() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, display_name, email, role, reports_to, avatar_url')
-    .in('role', ['tl', 'apc'])
-    .eq('is_active', true)
-    .is('deleted_at', null);
+  const [{ data, error }, links] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, display_name, email, role, reports_to, avatar_url')
+      .in('role', ['tl', 'apc'])
+      .eq('is_active', true)
+      .is('deleted_at', null),
+    supabase.from('apc_team_leads').select('apc_id, tl_id'),
+  ]);
   if (error) throw new Error(error.message);
   const people = data || [];
   const tls  = people.filter((p) => p.role === 'tl');
   const apcs = people.filter((p) => p.role === 'apc');
+  // A failed or empty link lookup falls back to reports_to alone, which is the old behaviour.
+  const teamOf = new Map();
+  for (const l of links.data || []) {
+    if (!teamOf.has(l.tl_id)) teamOf.set(l.tl_id, new Set());
+    teamOf.get(l.tl_id).add(l.apc_id);
+  }
   return tls
-    .map((tl) => ({ tl, apcs: apcs.filter((a) => a.reports_to === tl.id) }))
+    .map((tl) => ({ tl, apcs: apcs.filter((a) => a.reports_to === tl.id || teamOf.get(tl.id)?.has(a.id)) }))
     .sort((a, b) => (a.tl.display_name || '').localeCompare(b.tl.display_name || ''));
+}
+
+// The Team Leads one APC works under (mig 428): reports_to plus brand owners. Always includes reports_to.
+export async function listMyTeamLeadIds(apcId, reportsTo = null) {
+  const ids = new Set(reportsTo ? [reportsTo] : []);
+  const { data } = await supabase.from('apc_team_leads').select('tl_id').eq('apc_id', apcId);
+  for (const r of data || []) if (r.tl_id) ids.add(r.tl_id);
+  return [...ids];
 }
 
 export async function getAgendaTeamSchedules() {
