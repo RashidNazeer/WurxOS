@@ -8,8 +8,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getIncentiveWorkbookUrl } from '../../lib/incentivesApi';
 import { fetchWorkbookBuffer } from '../../lib/incentiveWorkbookLoad';
+import { karachiMonth } from '../../lib/serverTime';
 
 const MAX_ROWS = 500;
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const monthIdx = (v) => MONTHS.findIndex((m) => String(v ?? '').trim().toLowerCase().startsWith(m));
+
+// A bare number with a long tail (0.306133056, 94.83282675) is hard to read: show it rounded and keep
+// the exact value in the tooltip. Anything that is not a plain number is shown untouched.
+function pretty(v) {
+  const s = String(v ?? '').trim();
+  if (!/^-?\d+\.\d{4,}$/.test(s)) return { text: s, exact: null, numeric: /^[-$£€]?[\d,]+(\.\d+)?%?$/.test(s) };
+  const n = Number(s);
+  return { text: Math.abs(n) >= 1 ? n.toFixed(2) : n.toFixed(3), exact: s, numeric: true };
+}
 
 export default function WorkbookViewerModal({ onClose }) {
   const [state, setState] = useState({ status: 'loading', error: '' });
@@ -55,11 +67,25 @@ export default function WorkbookViewerModal({ onClose }) {
   }, [book, active]);
   const cols = useMemo(() => grid.reduce((m, r) => Math.max(m, r.length), 0), [grid]);
   const shown = grid.slice(0, MAX_ROWS);
+  // The header row names the months (the first row, within the top 8, with 2+ month cells).
+  const headerRow = useMemo(() => {
+    for (let r = 0; r < Math.min(grid.length, 8); r++) {
+      if ((grid[r] || []).slice(1).filter((v) => monthIdx(v) >= 0).length >= 2) return r;
+    }
+    return -1;
+  }, [grid]);
+  // Columns belonging to the current month (its goal and achieved halves) get a tint.
+  const nowMonth = Number(karachiMonth().slice(5, 7)) - 1;
+  const currentCols = useMemo(() => {
+    const set = new Set();
+    if (headerRow >= 0) (grid[headerRow] || []).forEach((v, c) => { if (c > 0 && monthIdx(v) === nowMonth) set.add(c); });
+    return set;
+  }, [grid, headerRow, nowMonth]);
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 1280, height: '88vh', zIndex: 1, borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 1280, height: '88vh', zIndex: 1, borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', background: 'var(--surface-1)', overflow: 'hidden' }}>
         <div className="d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
             <div className="fw-bold" style={{ fontSize: '0.95rem' }}><i className="bi bi-file-earmark-spreadsheet me-2" />Brand workbook</div>
@@ -90,7 +116,7 @@ export default function WorkbookViewerModal({ onClose }) {
           <div className="d-flex flex-grow-1" style={{ minHeight: 0 }}>
             <div className="d-flex flex-column" style={{ width: 230, borderRight: '1px solid var(--border-subtle)', minHeight: 0 }}>
               <div className="p-2">
-                <input className="form-control form-control-sm" placeholder="Find a brand tab…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                <input className="form-control form-control-sm" placeholder="Search tabs…" value={filter} onChange={(e) => setFilter(e.target.value)} />
               </div>
               <div style={{ overflowY: 'auto', flexGrow: 1 }}>
                 {names.length === 0 && <div className="text-muted small px-3 py-2">No tab matches.</div>}
@@ -109,23 +135,31 @@ export default function WorkbookViewerModal({ onClose }) {
               {grid.length === 0 ? (
                 <div className="text-muted p-4 small">This tab is empty.</div>
               ) : (
-                <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.78rem', width: 'max-content', minWidth: '100%' }}>
+                <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.8rem', width: 'max-content', minWidth: '100%', tableLayout: 'auto' }}>
                   <tbody>
-                    {shown.map((row, r) => (
-                      <tr key={r}>
-                        {Array.from({ length: cols }, (_, c) => {
-                          const v = row[c] ?? '';
-                          const first = c === 0;
-                          return (
-                            <td key={c} style={{
-                              padding: '5px 10px', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border-subtle)', borderRight: '1px solid var(--border-subtle)',
-                              color: 'var(--text-primary)', fontWeight: first ? 600 : 400,
-                              ...(first ? { position: 'sticky', left: 0, background: 'var(--surface-1)', zIndex: 1 } : {}),
-                            }}>{String(v)}</td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                    {shown.map((row, r) => {
+                      const isHead = r === headerRow;
+                      return (
+                        <tr key={r} className={isHead ? '' : 'wx-wb-row'}>
+                          {Array.from({ length: cols }, (_, c) => {
+                            const { text, exact, numeric } = pretty(row[c]);
+                            const first = c === 0;
+                            const now = currentCols.has(c);
+                            const bg = isHead ? 'var(--surface-3)' : now ? 'var(--accent-soft)' : r % 2 ? 'var(--surface-2)' : 'var(--surface-1)';
+                            return (
+                              <td key={c} title={exact || (text.length > 28 ? text : undefined)} style={{
+                                padding: '7px 12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                minWidth: first ? 220 : 96, maxWidth: first ? 260 : 190, textAlign: !first && numeric ? 'right' : 'left',
+                                borderBottom: '1px solid var(--border-subtle)', borderRight: '1px solid var(--border-subtle)',
+                                background: bg, color: isHead ? 'var(--text-primary)' : 'var(--text-primary)',
+                                fontWeight: first || isHead ? 700 : 400, fontVariantNumeric: 'tabular-nums',
+                                ...(first ? { position: 'sticky', left: 0, zIndex: 1, boxShadow: '1px 0 0 var(--border-subtle)' } : {}),
+                              }}>{text}</td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
