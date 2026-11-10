@@ -6,8 +6,9 @@ import {
   listAgendaTasks, markAttendance, startPresenting, stopPresenting, reopenPresentation,
   startMeeting, finishMeeting, pauseMeeting, getAgendaSettings, getAgendaTeamSchedules,
   subscribeAgendaMeetings, subscribeAgendaRoom, agendaMeetingStartAt, agendaMeetLinkFor,
-  getMyGuestTeams, listAgendaGuestTeams, isGuestOf,
+  getMyGuestTeams, listAgendaGuestTeams, isGuestOf, listMyTeamLeadIds,
 } from '../../lib/agendaApi';
+import { useMyTeamLeadIds } from '../../lib/useMyTeamLeadIds';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 import { useNow } from '../../hooks/useNow';
 import { useDialogs } from '../../components/common/useDialogs';
@@ -46,6 +47,8 @@ export default function AgendaOngoingPage() {
   const isApc = role === 'apc';
   const uid = user?.id;
   const location = useLocation();
+  // An APC working under several TLs (mig 428) is a member of each of those teams' meetings.
+  const apcTlIds = useMyTeamLeadIds(uid, isApc, profile?.reports_to);
 
   // Guest teams (mig 249). A guest attends the meetings an OL ticked them
   // into — no more, no less. RLS already hides the rest, so every meeting
@@ -120,8 +123,8 @@ export default function AgendaOngoingPage() {
       // OL and guests pick from the list, which RLS has already narrowed to
       // the meetings they may attend — so a guest with no invite gets an empty
       // list and the honest "no meeting" state.
-      const myTlId = isTL ? uid : (isApc ? (profile?.reports_to || null) : null);
-      const myTeamRoom = myTlId ? activeRooms.find((m) => m.tl_id === myTlId) : null;
+      const myTlIds = isTL ? [uid] : (isApc ? await listMyTeamLeadIds(uid, profile?.reports_to) : []);
+      const myTeamRoom = activeRooms.find((m) => myTlIds.includes(m.tl_id)) || null;
 
       let targetId;
       if (myTeamRoom && !guest) {
@@ -415,8 +418,8 @@ export default function AgendaOngoingPage() {
   // is a wider question — an APC on a guest team sitting in their own team's
   // room is a member, not an observer, and must not be told otherwise.
   const isMyTeam = isTL && meeting.tl_id === uid;
-  const myTlId   = isTL ? uid : (isApc ? (profile?.reports_to || null) : null);
-  const inOwnTeamRoom = !!myTlId && meeting.tl_id === myTlId;
+  const myTlIds  = isTL ? [uid] : apcTlIds;
+  const inOwnTeamRoom = !!meeting.tl_id && myTlIds.includes(meeting.tl_id);
   const hereAsGuest   = isGuest && !isOL && !inOwnTeamRoom;
   // The guest team(s) that got this viewer into THIS room — worth naming, so
   // an IPC sitting in four different teams' meetings knows which hat they wear.

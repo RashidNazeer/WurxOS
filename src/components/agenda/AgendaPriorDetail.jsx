@@ -7,6 +7,7 @@ import {
 import { listWeeklyRatingsForMeeting, weeklyOverall, getWeeklyRatingsEnabled } from '../../lib/weeklyRatingsApi';
 import { getLevelTokens } from '../../lib/performanceApi';
 import RateApcModal from './RateApcModal';
+import { useMyTeamLeadIds } from '../../lib/useMyTeamLeadIds';
 
 // Prior Meetings — a single completed meeting's record. Role-based:
 //   APC → their own evaluation only
@@ -59,14 +60,15 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isApc = role === 'apc';
   const uid = user?.id;
+  const apcTlIds = useMyTeamLeadIds(uid, isApc, profile?.reports_to);
 
   // A guest who sat in on THIS meeting sees its full read-only record — they
   // watched it happen. But guest membership must not upgrade what they see of
   // their OWN team's meeting: an APC on a guest team still gets the APC view
   // there (their own evaluation), not their teammates' timeline.
   const [myGuestSlugs, setMyGuestSlugs] = useState([]);
-  const myTlId = role === 'tl' ? uid : (isApc ? (profile?.reports_to || null) : null);
-  const inOwnTeamMeeting = !!myTlId && meeting.tl_id === myTlId;
+  const myTlIds = role === 'tl' ? [uid] : apcTlIds;
+  const inOwnTeamMeeting = !!meeting.tl_id && myTlIds.includes(meeting.tl_id);
   const canViewAll = isOL
     || (!inOwnTeamMeeting && isGuestOf(meeting.guest_teams, myGuestSlugs));
 
