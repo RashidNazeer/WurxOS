@@ -533,6 +533,19 @@ export async function submitReport(id, data) {
   return _updateAndReturn(id, patch);
 }
 
+// Once a WEEKLY report is verified, its numbers flow into that brand + week's checkpoint (when one
+// exists; otherwise the checkpoint fills itself from the verified report when it is created). Fire and
+// forget, and loaded lazily (checkpointAutofill imports this file): a problem here must never undo or
+// delay the verification.
+function syncCheckpointAfterVerify(reportId) {
+  (async () => {
+    const { data: row } = await supabase.from('reports').select('brand_id, type, period_start').eq('id', reportId).maybeSingle();
+    if (!row || row.type !== 'weekly') return;
+    const { syncCheckpointFromVerifiedReport } = await import('./checkpointAutofill');
+    await syncCheckpointFromVerifiedReport({ brandId: row.brand_id, weekStart: row.period_start });
+  })().catch(() => {});
+}
+
 export async function verifyReport(id) {
   const { data: auth } = await supabase.auth.getUser();
   const me = auth?.user?.id;
@@ -1420,6 +1433,7 @@ export async function updateReportStatus(reportId, nextStatus, auditData = null)
     result = await submitReport(reportId, null);
   } else if (nextStatus === 'verified') {
     result = await verifyReport(reportId);
+    syncCheckpointAfterVerify(reportId);
   } else if (nextStatus === 'approved') {
     result = await approveReport(reportId);
   } else {

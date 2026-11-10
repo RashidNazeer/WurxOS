@@ -3,7 +3,9 @@
 // is fully manual, §09–13 not yet wired).
 //
 // Sources, kept strictly separate (per the boss):
-//   • WEEKLY REPORT for the same week (and the N-2 week) — the exact numbers.
+//   • WEEKLY REPORT for the same week (and the N-2 week) — the exact numbers, from VERIFIED reports only.
+//     The mapping lives in checkpointReportSync.js; syncCheckpointFromVerifiedReport (below) fills an
+//     existing checkpoint the moment its report is verified, without overwriting what the APC typed.
 //   • DERIVED LIVE on the form + deck (NOT here): "Videos now live" is manual,
 //     and "Sample→video N-2" = videos now live ÷ approved(N-2). Neither is ever
 //     taken from this-week's videosPosted (that is not the N-2 cohort).
@@ -19,35 +21,20 @@
 // ============================================================
 import { supabase } from './supabase';
 import { getReportsForBrand } from './reportsApi';
-import { addWeeks } from './checkpointModel';
+import { getCheckpoint, saveCheckpoint } from './checkpointsApi';
+import { hydrate } from './checkpointDraft';
+import { buildReportPatch, mergeReportPatchInto, isVerifiedReport } from './checkpointReportSync';
+
+// The pure mapping + merge live in checkpointReportSync.js; re-exported so existing imports keep working.
+export { MIRROR_GROUPS, mirrorDuplicates, applyAutofillPatch } from './checkpointReportSync';
 
 const asStr = (v) => (v === null || v === undefined || v === '' ? null : String(v));
-const asNum = (v) => { if (v === '' || v == null) return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
-const sumBy = (arr, key) => (Array.isArray(arr) ? arr.reduce((a, r) => a + (asNum(r?.[key]) || 0), 0) : 0);
-const round = (x, d) => { const p = 10 ** d; return Math.round(x * p) / p; };
 const addDaysISO = (iso, days) => {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d)); dt.setUTCDate(dt.getUTCDate() + days);
   const p2 = (x) => String(x).padStart(2, '0');
   return `${dt.getUTCFullYear()}-${p2(dt.getUTCMonth() + 1)}-${p2(dt.getUTCDate())}`;
 };
-
-// immutable nested set by dot-path (indices allowed, e.g. samples.products)
-function setIn(obj, path, value) {
-  const keys = path.split('.');
-  const clone = Array.isArray(obj) ? [...obj] : { ...obj };
-  let cur = clone;
-  for (let i = 0; i < keys.length - 1; i++) {
-    const k = keys[i];
-    cur[k] = Array.isArray(cur[k]) ? [...cur[k]] : { ...cur[k] };
-    cur = cur[k];
-  }
-  cur[keys[keys.length - 1]] = value;
-  return clone;
-}
-function getIn(obj, path) {
-  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
-}
 
 // Call the Euka edge function for the two funnel counts. Returns
 // { targetInvites, optedIn, optInStage, funnelStages } or throws.
@@ -91,81 +78,21 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
   const stage = (label, pct) => { try { onStage?.({ label, pct }); } catch { /* ignore */ } };
   const scalars = {};
   const arrays = {};
-  const meta = { reportFound: false, reportN2Found: false, providerName: null, providerLinked: false, providerTried: false, providerOk: false, providerError: null, providerNote: null, eukaStages: null, filled: 0 };
+  const meta = { reportFound: false, reportPending: false, reportN2Found: false, reportId: null, reportVerifiedAt: '', providerName: null, providerLinked: false, providerTried: false, providerOk: false, providerError: null, providerNote: null, eukaStages: null, filled: 0 };
   const set = (path, v) => { const val = asStr(v); if (val !== null) { scalars[path] = val; meta.filled++; } };
 
-  // ── weekly reports (this week + N-2) ───────────────────────────────
+  // ── weekly reports (this week + N-2): VERIFIED ones only (see checkpointReportSync.js) ──
   stage('Reading weekly report…', 40);
   let reports = [];
   try { reports = await getReportsForBrand(brandId); } catch { reports = []; }
-  const byStart = (ps) => reports.find((r) => r.weekStart === ps) || null;
-  const wk = byStart(weekStart);
-  const n2 = byStart(addWeeks(weekStart, -2));
-  meta.reportFound = !!wk;
-  meta.reportN2Found = !!n2;
-
-  if (wk) {
-    const op = wk.overallPerformance || {};
-    const on = wk.overallNotes || {};
-    const hasGmvMax = Array.isArray(wk.gmvMax) && wk.gmvMax.length > 0;
-    const gmvMaxSpend = sumBy(wk.gmvMax, 'spend');
-    const gmvMaxGmv = sumBy(wk.gmvMax, 'gmv');
-    const gmvMaxOrders = sumBy(wk.gmvMax, 'orders');
-
-    // §01 Affiliate funnel — recruit + produce
-    set('funnel.approved', op.samplesApproved);
-    // "Videos now live" is MANUAL — it's the videos posted by the creators we
-    // approved in Wk N-2 (the cohort), which is NOT the weekly report's
-    // this-week videosPosted. So we don't auto-fill it; the APC enters it
-    // (the form shows a hint referencing the Wk N-2 approved count).
-
-    // §04 Performance snapshot — THIS-WEEK values (last-week from carry-forward).
-    // Cost/order comes from the report: GMV Max spend ÷ GMV Max orders (the same
-    // basis the report's per-campaign cost-per-order uses).
-    set('snapshot.kpis.gmv.cur', op.gmv);
-    if (hasGmvMax) set('snapshot.kpis.gmvMaxSpend.cur', round(gmvMaxSpend, 2));
-    set('snapshot.kpis.roi.cur', op.roi);
-    set('snapshot.kpis.orders.cur', op.orders);
-    if (hasGmvMax && gmvMaxOrders) set('snapshot.kpis.costPerOrder.cur', round(gmvMaxSpend / gmvMaxOrders, 2));
-    set('snapshot.kpis.videosLive.cur', op.videosPosted);
-    // ctor + avg rating stay manual — not in the weekly report
-
-    // §05 Samples
-    set('samples.approvedThisWeek', op.samplesApproved);
-    set('samples.mtdApproved', on.samplesApproved);
-    const products = (wk.productHighlights || [])
-      .filter((p) => (p.productName || '').trim() || asNum(p.samplesApprovedWeek) != null)
-      .map((p) => ({
-        name: p.productName || '',
-        count: (p.samplesApprovedWeek === '' || p.samplesApprovedWeek == null) ? '' : String(p.samplesApprovedWeek),
-      }));
-    if (products.length) { arrays['samples.products'] = products; meta.filled++; }
-
-    // §06 Content & traffic — SKU orders + top videos this week (impressions/
-    // clicks stay manual; last-week from carry-forward). Top-video ANGLE isn't
-    // in the report, so it's left blank for the APC.
-    set('traffic.orders', op.orders);
-    const topVideos = (wk.topVideos || [])
-      .filter((v) => (v.creatorName || '').trim() || asNum(v.gmv) != null)
-      .map((v) => ({ creator: v.creatorName || '', angle: '', gmv: (v.gmv === '' || v.gmv == null) ? '' : String(v.gmv) }));
-    if (topVideos.length) { arrays['traffic.topVideos'] = topVideos; meta.filled++; }
-
-    // §08 GMV Max & paid — spend + gross revenue + GMV Max orders straight from
-    // the weekly GMV Max table, so the deck's ROI (=grossRev÷spend) and
-    // cost/order (=spend÷orders) reproduce the report's own values. (targetRoi /
-    // ROI-protection / mode carried forward; decision + screenshot manual.)
-    if (hasGmvMax) {
-      set('paid.spend', round(gmvMaxSpend, 2));
-      set('paid.grossRevenue', round(gmvMaxGmv, 2));
-      set('paid.skuOrders', gmvMaxOrders);
-    }
-  }
-
-  // §1 Produce — Approved · Wk N-2 (from the N-2 weekly report). "Sample→video
-  // N-2" is NOT auto-filled: it equals Videos now live ÷ Approved · Wk N-2, and
-  // the form + deck derive it live from those two fields (never from this-week's
-  // videosPosted, which is not the N-2 cohort).
-  if (n2) set('funnel.approvedN2', n2.overallPerformance?.samplesApproved);
+  const rp = buildReportPatch(reports, weekStart);
+  Object.assign(scalars, rp.scalars);
+  Object.assign(arrays, rp.arrays);
+  meta.filled += rp.meta.filled;
+  Object.assign(meta, {
+    reportFound: rp.meta.reportFound, reportPending: rp.meta.reportPending, reportN2Found: rp.meta.reportN2Found,
+    reportId: rp.meta.reportId, reportVerifiedAt: rp.meta.reportVerifiedAt,
+  });
 
   // ── Euka OR Reacher (whichever the brand is on) — target invites + opted in ──
   // A brand on neither is skipped silently here, which read to APCs on unlinked
@@ -201,40 +128,38 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
   return { scalars, arrays, meta };
 }
 
-// Fields that are the SAME number in more than one section, so the APC only ever
-// types it once (verified same-type — the autofill fills every member of a group
-// from the identical report value; boss-confirmed for sample requests). Each
-// group's members mirror each other (two-way in the form; and here after a patch
-// so an autofill/Euka value that lands on one member propagates to the rest).
-// Look-alikes that are NOT the same (e.g. "Videos now live" N-2 cohort vs §04
-// "Videos Live" this week; §08 GMV-Max "SKU orders" vs the weekly total; MTD vs
-// weekly; this-week vs last-week) are deliberately NOT grouped.
-export const MIRROR_GROUPS = [
-  ['funnel.targetInvites', 'outreach.reachInvites', 'effort.invitesSent'],   // target invites
-  ['funnel.approved', 'samples.approvedThisWeek'],                            // samples approved this week
-  ['funnel.sampleRequests', 'samples.requestsReceived', 'effort.sampleRequested'], // sample requests
-  ['snapshot.kpis.orders.cur', 'traffic.orders'],                            // weekly SKU orders (total)
-  ['snapshot.kpis.gmvMaxSpend.cur', 'paid.spend'],                           // GMV Max spend
-];
-
-// Propagate each group's value onto all its members. Uses the first non-empty
-// member as the source (autofill writes the first-listed member), never mirrors
-// a blank. Idempotent — the members are already equal after autofill/typing.
-export function mirrorDuplicates(data) {
-  let d = data;
-  for (const group of MIRROR_GROUPS) {
-    let v = null;
-    for (const p of group) { const cur = getIn(d, p); if (cur !== '' && cur != null) { v = String(cur); break; } }
-    if (v == null) continue;
-    for (const p of group) d = setIn(d, p, v);
-  }
-  return d;
+// The verified weekly report for one brand + week, or null. Only a verified (or approved) report counts.
+export async function getVerifiedReportForWeek(brandId, weekStart) {
+  let reports = [];
+  try { reports = await getReportsForBrand(brandId); } catch { reports = []; }
+  const r = reports.find((x) => x.weekStart === weekStart) || null;
+  return isVerifiedReport(r) ? r : null;
 }
 
-// Apply a patch onto checkpoint data (returns a new object).
-export function applyAutofillPatch(data, patch) {
-  let d = data;
-  for (const [path, v] of Object.entries(patch.scalars || {})) d = setIn(d, path, v);
-  for (const [path, v] of Object.entries(patch.arrays || {})) d = setIn(d, path, v);
-  return d;
+/**
+ * Fill an EXISTING checkpoint from the brand's verified weekly report for that week.
+ * Called the moment a weekly report is verified (reportsApi.updateReportStatus). Never overwrites a
+ * person's own entries (mergeReportPatchInto), never touches the checkpoint's status, and does nothing
+ * when there is no checkpoint yet (it fills itself from the verified report when it is created).
+ * Best effort: callers must not let a failure here undo the verification.
+ */
+export async function syncCheckpointFromVerifiedReport({ brandId, weekStart }) {
+  if (!brandId || !weekStart) return { synced: false, reason: 'missing brand or week' };
+  let reports = [];
+  try { reports = await getReportsForBrand(brandId); } catch { reports = []; }
+  const patch = buildReportPatch(reports, weekStart);
+  if (!patch.meta.reportFound) return { synced: false, reason: 'the weekly report is not verified' };
+  const cp = await getCheckpoint(brandId, weekStart);
+  if (!cp) return { synced: false, reason: 'no checkpoint for this week yet' };
+  const { data, filled, kept, changed } = mergeReportPatchInto(hydrate(cp.data), patch);
+  if (!changed) return { synced: true, filled: 0, kept };
+  await saveCheckpoint({ brandId, weekStart, weekLabel: cp.week_label, data });
+  return { synced: true, filled, kept };
+}
+
+// The report patch for one brand + week (verified reports only), for the checkpoint page to merge on open.
+export async function getReportPatchForWeek(brandId, weekStart) {
+  let reports = [];
+  try { reports = await getReportsForBrand(brandId); } catch { reports = []; }
+  return buildReportPatch(reports, weekStart);
 }

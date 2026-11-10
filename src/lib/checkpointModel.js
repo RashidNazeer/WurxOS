@@ -99,6 +99,11 @@ export function EMPTY_CHECKPOINT() {
       bottlenecks: [],
       rows: [{ action: '', owner: '', due: '', status: 'open' }],
     },
+
+    // Bookkeeping for the verified-report sync (checkpointReportSync.js): which report last filled this
+    // checkpoint and what it wrote, so a later sync refreshes its own values but never a person's edits.
+    // `values` is a JSON string on purpose: hydrate() only keeps keys that exist in this template.
+    _autofill: { reportId: '', verifiedAt: '', values: '' },
   };
 }
 

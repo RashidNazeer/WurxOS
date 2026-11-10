@@ -28,7 +28,8 @@ import {
   submitCheckpoint, verifyCheckpoint, returnCheckpoint, reopenCheckpoint, CheckpointAccountMismatchError,
 } from '../../lib/checkpointsApi';
 import { loadDraft, saveDraft, clearDraft, hydrate, purgeLegacyDrafts } from '../../lib/checkpointDraft';
-import { runCheckpointAutofill, applyAutofillPatch, mirrorDuplicates } from '../../lib/checkpointAutofill';
+import { runCheckpointAutofill, applyAutofillPatch, mirrorDuplicates, getReportPatchForWeek } from '../../lib/checkpointAutofill';
+import { mergeReportPatchInto } from '../../lib/checkpointReportSync';
 import { deductPromptApcCheckpoint } from '../../lib/apcReportingApi';
 import { listManagedBrandIds, subscribePaidCollabBrands, getPaidCollabEntry, getLatestPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
 import PaidCollabCheckpointDashboard from './PaidCollabCheckpointDashboard';
@@ -61,7 +62,9 @@ const pillFor = (s) => STATUS_PILL[s] || STATUS_PILL.draft;
 // filled vs. what they still need to complete by hand.
 function autofillSummary(meta, created) {
   if (!meta) return created ? 'Blank checkpoint created — fill in each section below, then Done → Submit.' : '';
-  const bits = [meta.reportFound ? 'weekly report ✓' : 'no weekly report for this week'];
+  const bits = [meta.reportFound ? 'verified weekly report ✓'
+    : meta.reportPending ? 'weekly report not verified yet - its numbers fill in automatically once it is'
+    : 'no weekly report for this week'];
   if (meta.reportN2Found) bits.push('N-2 report ✓');
   if (meta.providerTried) {
     const who = meta.providerName;
@@ -443,6 +446,26 @@ function ApcCheckpointPage() {
   const canReturn = false;   // retired — no return step
   const canReopen = false;   // retired — nothing to reopen
   const cpId = () => cp?.id || weeks.find((w) => w.week_start === weekStart)?.id || null;
+
+  // A verified weekly report fills this checkpoint: blank fields, and fields still holding what the
+  // report last wrote. Never what the APC typed. Runs once per brand + week as the checkpoint opens, which
+  // also catches a report that was verified while this page was closed (the verify itself syncs too).
+  const dataRef = useRef(null);
+  dataRef.current = data;
+  const syncedKeyRef = useRef('');
+  useEffect(() => {
+    if (!data || !canEditContent || !brandId || syncedKeyRef.current === currentKey) return;
+    const key = currentKey;
+    syncedKeyRef.current = key;
+    getReportPatchForWeek(brandId, weekStart).then((patch) => {
+      if (currentKeyRef.current !== key || !patch.meta.reportFound || !dataRef.current) return;
+      const r = mergeReportPatchInto(dataRef.current, patch);
+      if (!r.changed) return;
+      setLoaded({ key, data: r.data });
+      const keptNote = r.kept ? ` ${r.kept} figure${r.kept === 1 ? '' : 's'} you entered differ${r.kept === 1 ? 's' : ''} from the report and ${r.kept === 1 ? 'was' : 'were'} left as you set ${r.kept === 1 ? 'it' : 'them'} (press Auto-fill to take the report's numbers instead).` : '';
+      if (r.filled > 0) setAutofillMsg(`Filled ${r.filled} field${r.filled === 1 ? '' : 's'} from the verified weekly report.${keptNote}`);
+      else if (r.kept > 0) setAutofillMsg(`The verified weekly report has ${r.kept} figure${r.kept === 1 ? '' : 's'} that differ${r.kept === 1 ? 's' : ''} from what is entered here. They were left as you set them (press Auto-fill to take the report's numbers instead).`);    }).catch(() => {});
+  }, [data, canEditContent, brandId, weekStart, currentKey]);
 
   async function runWf(kind, fn) {
     setWfBusy(kind); setWfErr('');
