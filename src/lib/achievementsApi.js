@@ -117,22 +117,3 @@ export async function getAchievementOdds(month, incPct = null) {
     focusPillar: r.focus_pillar, focusGap: r.focus_gap == null ? null : Number(r.focus_gap),
   };
 }
-
-// The uplifting line shown right after clock-in (APC / TL). Tone follows how close the person
-// is to the top; null when there is no chance to quote (not rated yet, too few people, ...).
-export function oddsClockInMessage(odds) {
-  if (!odds || !odds.eligible || odds.probability == null) return null;
-  const title = odds.pool === 'tl' ? 'TL of the Month' : 'APC of the Month';
-  const p = odds.probability;
-  // Provisional = incentives not filled/verified yet: ask for the progress so far.
-  const ask = odds.provisional ? ' Update your completed incentive goals for an exact number.' : '';
-  const msg = oddsLine(p, title);
-  return msg + ask;
-}
-
-function oddsLine(p, title) {
-  if (p >= 40) return `You're leading the race: ${p}% chance to become ${title}. Keep that streak going! 🏆`;
-  if (p >= 20) return `${p}% chance to become ${title}. You're right in the mix, and today can move it! 🚀`;
-  if (p >= 8) return `You have a ${p}% chance of becoming ${title}. Every goal you finish today pushes it higher! 💪`;
-  return `You have a ${p}% chance of becoming ${title}, and the month is still open. Small wins today add up! 🌟`;
-}

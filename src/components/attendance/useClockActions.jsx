@@ -17,7 +17,8 @@ import {
 } from '../../lib/attendanceApi';
 import ApcGmvGateModal from './ApcGmvGateModal';
 import { apcGmvStatus, submitApcGmv } from '../../lib/apcGmvApi';
-import { getAchievementOdds, oddsClockInMessage } from '../../lib/achievementsApi';
+import { getAchievementOdds } from '../../lib/achievementsApi';
+import ClockInOddsCard from './ClockInOddsCard';
 import { karachiYmd } from '../../lib/serverTime';
 
 export function useClockActions() {
@@ -48,14 +49,14 @@ export function useClockActions() {
   const [gmvStatus, setGmvStatus] = useState(null);
   const [pendingLocation, setPendingLocation] = useState(null);
   const [clockedInToast, setClockedInToast] = useState(false);
-  const [oddsMsg, setOddsMsg] = useState(null);
+  const [oddsInfo, setOddsInfo] = useState(null);
 
   // Auto-dismiss the "You're clocked in" confirmation toast.
   useEffect(() => {
     if (!clockedInToast) return undefined;
-    const t = setTimeout(() => setClockedInToast(false), oddsMsg ? 7000 : 2800);
+    const t = setTimeout(() => setClockedInToast(false), 2800);
     return () => clearTimeout(t);
-  }, [clockedInToast, oddsMsg]);
+  }, [clockedInToast]);
 
   const isApcOrIpc = userRole === 'apc' || userRole === 'ipc';
   const isTL = userRole === 'tl';
@@ -128,11 +129,13 @@ export function useClockActions() {
     // Force-refresh — realtime can be flaky and we never want the user
     // to see stale state after their own action.
     refetchRecord();
-    setOddsMsg(null);
+    setOddsInfo(null);
     setClockedInToast(true);
     // APC / TL: a motivating line with their chance of APC / TL of the Month. Best effort.
     if (userRole === 'apc' || userRole === 'tl') {
-      getAchievementOdds(karachiYmd().slice(0, 7)).then((o) => setOddsMsg(oddsClockInMessage(o))).catch(() => {});
+      getAchievementOdds(karachiYmd().slice(0, 7))
+        .then((o) => { if (o && o.eligible && o.probability != null) setOddsInfo(o); })
+        .catch(() => {});
     }
   }
 
@@ -268,16 +271,16 @@ export function useClockActions() {
     )}
 
     {/* "You're clocked in" confirmation toast */}
-    {clockedInToast && (
+    {/* APC / TL: the big chance-of-the-month card replaces the small toast (mig 445-447). */}
+    {oddsInfo && <ClockInOddsCard odds={oddsInfo} onClose={() => { setOddsInfo(null); setClockedInToast(false); }} />}
+    {clockedInToast && !oddsInfo && (
       <div style={{
         position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 1100,
-        display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 16px', borderRadius: 'var(--radius-md)',
-        width: 'max-content', maxWidth: 'min(420px, calc(100vw - 32px))',
+        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 'var(--radius-md)',
         background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
         boxShadow: 'var(--shadow-lg)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
       }}>
-        <span><i className="bi bi-check-circle-fill" style={{ color: 'var(--success)' }} /> You're clocked in</span>
-        {oddsMsg && <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>{oddsMsg}</span>}
+        <i className="bi bi-check-circle-fill" style={{ color: 'var(--success)' }} /> You're clocked in
       </div>
     )}
 
