@@ -12,6 +12,7 @@ import {
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
 import FetchAchievedModal from './FetchAchievedModal';
+import WorkbookViewerModal from './WorkbookViewerModal';
 import CommissionNote from './CommissionNote';
 import InactiveBrandsNotice from './InactiveBrandsNotice';
 
@@ -728,6 +729,9 @@ export default function OLIncentivesPage() {
   const [detailsTarget, setDetailsTarget] = useState(null);
   const [verifying, setVerifying] = useState(null);
   const [showFetchAchieved, setShowFetchAchieved] = useState(false);
+  const [showWorkbook, setShowWorkbook] = useState(false);
+  // Only the Boss and OLs may read the workbook (its link is theirs alone, mig 423).
+  const canViewWorkbook = profile?.role === 'boss' || profile?.role === 'ol';
   const [salaryBusy, setSalaryBusy] = useState(false);
   const toast = useToast();
   const [reloadKey, setReloadKey] = useState(0);
@@ -1176,6 +1180,13 @@ export default function OLIncentivesPage() {
                 </button>
               )}
               <div className="d-inline-flex gap-2 ms-auto">
+                {canViewWorkbook && (
+                  <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={() => setShowWorkbook(true)}
+                    title="Read the whole brand workbook (read-only)">
+                    <i className="bi bi-file-earmark-spreadsheet" /> View Workbook
+                  </button>
+                )}
                 {tab === 'apcs' && (
                   <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
                     style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={() => setShowFetchAchieved(true)}>
@@ -1312,6 +1323,7 @@ export default function OLIncentivesPage() {
           verifying={verifying}
         />
       )}
+      {showWorkbook && <WorkbookViewerModal onClose={() => setShowWorkbook(false)} />}
       {showFetchAchieved && (
         <FetchAchievedModal
           users={apcs} month={month} monthLabel={getMonthLabel(month)}
