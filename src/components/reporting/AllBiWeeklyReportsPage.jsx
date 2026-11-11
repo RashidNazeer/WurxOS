@@ -17,6 +17,7 @@ import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
 import { verifyConfirmText } from '../../lib/reportsApi';
+import ReportVerifiedBanner from './ReportVerifiedBanner';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import ClientMultiSelect from './ClientMultiSelect';
 import EditReportDatesModal from './EditReportDatesModal';
@@ -567,6 +568,7 @@ export default function AllBiWeeklyReportsPage() {
           isBrandOwner={brands.find((b) => b.id === viewReport.brandId)?.ownerId === user?.id}
           onRated={(updated) => setViewReport((r) => (r ? { ...r, ...updated } : updated))}
         />
+        {userRole === 'ol' && <ReportVerifiedBanner report={viewReport} />}
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
             style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--danger)' }}>

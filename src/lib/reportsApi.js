@@ -1487,7 +1487,7 @@ async function _listByType(type, { brandId = null, brandIds = null, limit = null
 export async function listReportStatuses({ since = null, types = null } = {}) {
   let q = supabase
     .from('reports')
-    .select('id, brand_id, type, status, period_start, period_end, period_label, rejection_note, author_id, submitted_at, updated_at, brand:brand_id(brand_name), author:author_id(display_name)')
+    .select('id, brand_id, type, status, period_start, period_end, period_label, rejection_note, author_id, submitted_at, updated_at, brand:brand_id(brand_name), author:author_id(display_name), verifier:verified_by(display_name)')
     .order('period_start', { ascending: false });
   if (since) q = q.gte('period_start', since);
   if (Array.isArray(types) && types.length) q = q.in('type', types);
@@ -1505,6 +1505,7 @@ export async function listReportStatuses({ since = null, types = null } = {}) {
     rejectionNote: r.rejection_note || '',
     authorId: r.author_id,
     authorName: r.author?.display_name || '',
+    verifierName: r.verifier?.display_name || '',
     submittedAt: r.submitted_at,
     updatedAt: r.updated_at,
   }));

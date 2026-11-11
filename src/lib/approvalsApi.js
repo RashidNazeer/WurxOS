@@ -109,7 +109,7 @@ async function fetchReports(uid, role) {
   return rows.map((r) => ({
     kind: 'reports', id: r.id, who: r.authorName, whoRole: 'apc',
     title: `${TYPE_LABEL[r.type] || 'Report'} · ${r.brandName}`,
-    detail: `${r.periodLabel || r.periodStart}${r.rejectionNote && wanted === 'submitted' ? ` · Returned by OL: ${r.rejectionNote}` : ''}`,
+    detail: `${r.periodLabel || r.periodStart}${wanted === 'verified' && r.verifierName ? ` · Verified by TL ${r.verifierName}` : ''}${r.rejectionNote && wanted === 'submitted' ? ` · Returned by OL: ${r.rejectionNote}` : ''}`,
     at: ts(r.submittedAt || r.updatedAt), canAct: true,
     link: reportUrl({ id: r.id, brandId: r.brandId, type: r.type }), raw: r,
   }));
