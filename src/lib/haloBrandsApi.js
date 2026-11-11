@@ -23,7 +23,7 @@ export async function listHaloEnabledBrands() {
   if (!ids.length) return [];
 
   const [{ data: brands, error: e2 }, { data: datasets, error: e3 }] = await Promise.all([
-    supabase.from('brands').select('id, brand_name, client_name, logo_url, status').in('id', ids),
+    supabase.from('brands').select('id, brand_name, client_name, logo_url, status, currency').in('id', ids),
     supabase.from('halo_datasets').select(DS_COLS).in('brand_id', ids),
   ]);
   if (e2) throw e2;

@@ -257,17 +257,22 @@ function buildColumnMap(headerCells) {
   return map;
 }
 
-// Detect the currency symbol used in the grid (first of £/€/$ seen), default $.
+// The brand's own currency code (brands.currency) -> the symbol Halo shows.
+const CURRENCY_SYMBOL = { USD: '$', GBP: '£', EUR: '€' };
+
+// Detect the currency symbol used in the grid, default $. The MOST COMMON symbol
+// wins: the first one seen is not safe — a single stray "£0.0" cell in an NTB total
+// stored Dr Tobias (a USD brand) as £ for every figure on the page.
 function detectCurrency(grid) {
+  const count = { '£': 0, '€': 0, '$': 0 };
   for (const row of grid) {
     for (const cell of row || []) {
       if (typeof cell !== 'string') continue;
-      if (cell.includes('£')) return '£';
-      if (cell.includes('€')) return '€';
-      if (cell.includes('$')) return '$';
+      for (const sym of Object.keys(count)) if (cell.includes(sym)) count[sym] += 1;
     }
   }
-  return '$';
+  const [sym, n] = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+  return n > 0 ? sym : '$';
 }
 
 // Map the fixed + positional columns of a sheet. Returns the date column plus
@@ -480,12 +485,14 @@ function parseSheetGrid(grid, granularity, opts = {}) {
  * Parse ONE uploaded sheet as a specific granularity.
  * @param {ArrayBuffer} arrayBuffer
  * @param {'day'|'week'|'month'} granularity
+ * @param {{ brandCurrency?: string }} [opts] brands.currency ('USD'/'GBP'/'EUR'); when it is a known
+ *   code it decides the symbol, otherwise the sheet's most common symbol does.
  * @returns {{ rows:Array<{date, periodLabel, metrics, productRevenue, keywords,
  *   keywordRanks}>, granularity, products, volumeKeywords, rankKeywords,
  *   currency, periodStart, periodEnd, foundKeys, missingColumns, missingAnchors,
  *   warnings }}
  */
-export async function parseHaloGranularitySheet(arrayBuffer, granularity) {
+export async function parseHaloGranularitySheet(arrayBuffer, granularity, opts = {}) {
   if (!['day', 'week', 'month'].includes(granularity)) {
     throw new Error(`Unknown granularity "${granularity}" (expected day, week or month).`);
   }
@@ -497,7 +504,7 @@ export async function parseHaloGranularitySheet(arrayBuffer, granularity) {
   const grid = grids.find((g) => findHeaderRow(g) >= 0);
   if (!grid) throw new Error('No data sheet found (needs a "Date" column plus metrics like GMV, Orders, ROI).');
 
-  const currency = detectCurrency(grid);
+  const currency = CURRENCY_SYMBOL[String(opts.brandCurrency || '').toUpperCase()] || detectCurrency(grid);
   const parsed = parseSheetGrid(grid, granularity, {});
   if (!parsed.rows.length) throw new Error('No data rows found under the header.');
 

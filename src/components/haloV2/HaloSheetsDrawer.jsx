@@ -95,7 +95,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
     if (!f) return;
     try {
       const ab = await f.arrayBuffer();
-      const p = await parseHaloGranularitySheet(ab, granularity);
+      const p = await parseHaloGranularitySheet(ab, granularity, { brandCurrency: brand.currency });
       setParsed(p);
     } catch (e) { setParseErr(e.message || String(e)); }
   }
