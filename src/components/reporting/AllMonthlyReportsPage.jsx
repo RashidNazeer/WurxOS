@@ -431,7 +431,7 @@ export default function AllMonthlyReportsPage() {
     const canEdit = userRole === 'ol' && rStatus !== 'approved';
     const canEditDates = userRole === 'ol' || userRole === 'boss';
     const canSubmitAsApc = userRole === 'ol' && rStatus === 'draft';
-    const canVerifyAsTl = userRole === 'ol' && rStatus === 'submitted';
+    const canVerifyAsTl = userRole === 'boss' && rStatus === 'submitted';
     const canApprove = userRole === 'ol' && rStatus === 'verified';
     const canReject = userRole === 'ol' && (rStatus === 'verified' || rStatus === 'submitted');
     const canReopen = userRole === 'ol' && rStatus === 'approved';

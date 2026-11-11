@@ -286,7 +286,7 @@ export function reportPermissions({ report, role, uid, brandOwnerId }) {
   return {
     canEditContent: (status === 'draft' && (isAuthor || isAdmin)),
     canSubmit:      (status === 'draft' && (isAuthor || isAdmin)),
-    canVerify:      (status === 'submitted' && (isBrandOwner || isAdmin)),
+    canVerify:      (status === 'submitted' && (isBrandOwner || isBoss)),
     canApprove:     (status === 'verified' && isAdmin),
     canReject:      canTlReject || canAdminReject,
     canReopen:      status === 'approved' && isAdmin,
