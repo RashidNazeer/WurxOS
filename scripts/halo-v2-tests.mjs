@@ -1849,6 +1849,30 @@ function haloFinderTest(res) {
       && !/incremental lift/i.test(NOT_CLAIM_LINE), NOT_CLAIM_LINE);
 }
 
+// ---- sheet currency (Dr Tobias was stored as £ because of one stray £ cell) ----
+{
+  const XLSX = await import('xlsx');
+  const { parseHaloGranularitySheet } = await import('../src/lib/haloParse.js');
+  const toBuf = (aoa) => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Master');
+    const b = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+  };
+  const header = ['Date', 'GMV', 'Orders', 'Items sold', 'NTB', 'Total Revenue/Day'];
+  const stray = [['£0.0'], ...[1, 2, 3, 4, 5].map((d) => ['2026-06-0' + d, '$' + (100 + d), 5, 6, '', '$' + (900 + d)])];
+  const aoa = [['', '', '', '', '£0.0', ''], header, ...stray.slice(1)];
+  const p1 = await parseHaloGranularitySheet(toBuf(aoa), 'day');
+  check('CUR 1. one stray £ cell among dollar cells does not make the sheet £', p1.currency === '$', p1.currency);
+  const p2 = await parseHaloGranularitySheet(toBuf(aoa), 'day', { brandCurrency: 'GBP' });
+  check('CUR 2. the brand currency decides when it is a known code', p2.currency === '£', p2.currency);
+  const p3 = await parseHaloGranularitySheet(toBuf(aoa), 'day', { brandCurrency: 'USD' });
+  check('CUR 3. a USD brand is always $', p3.currency === '$', p3.currency);
+  check('CUR 4. the figures are read exactly (GMV sum 515, revenue sum 4515)',
+    Math.abs(p1.rows.reduce((a, r) => a + r.metrics.gmv, 0) - 515) < 1e-9
+      && Math.abs(p1.rows.reduce((a, r) => a + r.metrics.revenue_per_day, 0) - 4515) < 1e-9, '');
+}
+
 console.log('\nHalo V2 — brief §33 test suite\n');
 console.log(results.join('\n'));
 console.log(`\n  ${passed} passed, ${failed} failed\n`);
