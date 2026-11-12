@@ -55,11 +55,11 @@ export default function ClientSummarySheet({
       >
         {/* ── Header ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.01em' }}>Amazon Halo</div>
-            {brandName && <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 2 }}>{brandName}</div>}
+          <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.01em', lineHeight: 1.2, whiteSpace: 'nowrap' }}>Amazon Halo</div>
+            {brandName && <div style={{ fontSize: 14, lineHeight: 1.3, color: 'var(--text-secondary)', marginTop: 4 }}>{brandName}</div>}
           </div>
-          <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6, flex: '0 0 auto', whiteSpace: 'nowrap' }}>
             <div>{GRAIN_LABEL[gran] || gran} view</div>
             {range?.start && range?.end && <div>{range.start} to {range.end}</div>}
             <div>Generated {new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
