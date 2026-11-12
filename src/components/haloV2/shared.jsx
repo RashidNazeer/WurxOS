@@ -8,6 +8,7 @@
 // ============================================================
 
 import { useEffect, useRef } from 'react';
+import { signedMoney } from '../../lib/haloFields';
 
 export const TT_STYLE = {
   background: 'var(--chart-tooltip-bg, var(--surface-1))',
@@ -35,9 +36,9 @@ export const SERIES_BASELINE = '#94a3b8';
 // The period being planned may be quoted in a different currency from the
 // sheet, and fmtValue reads one module-level symbol for the whole app. Two
 // decimals exact, matching every other money figure in WurxOS.
-export const moneyWith = (sym, v) => `${sym}${Number(v || 0).toLocaleString(undefined, {
+export const moneyWith = (sym, v) => signedMoney(sym, v || 0, Number(v || 0).toLocaleString(undefined, {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
-})}`;
+}));
 
 export const FieldLabel = ({ children }) => (
   <div style={{

@@ -217,7 +217,7 @@ export function keyTakeaway(result, { unit = 'period', xKey, yKey } = {}) {
       : 'Treat this as a first look. There is not enough history for a modelled estimate, so no spend scenarios.';
 
   return {
-    headline: `${xName} and ${yName} ${together} ${pct(r)} ${when}.`,
+    headline: `${xName} and ${yName} ${together} (${pct(r)}), ${when}.`,
     strength,
     direction: r > 0 ? 'positive' : 'negative',
     confidenceLabel: m.available ? m.confidenceLabel : null,
