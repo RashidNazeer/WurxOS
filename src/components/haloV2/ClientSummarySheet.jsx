@@ -62,7 +62,7 @@ export default function ClientSummarySheet({
           <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
             <div>{GRAIN_LABEL[gran] || gran} view</div>
             {range?.start && range?.end && <div>{range.start} to {range.end}</div>}
-            <div>Generated {new Date().toLocaleString()}</div>
+            <div>Generated {new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
           </div>
         </div>
 
@@ -85,7 +85,7 @@ export default function ClientSummarySheet({
             <Figure label={snapshot.range.label} value={snapshot.range.value} sub={snapshot.range.sub} />
             <Figure
               label="Signal strength"
-              value={`${snapshot.signal.level}${snapshot.signal.confidenceLabel ? ` (${snapshot.signal.confidenceLabel})` : ''}`}
+              value={snapshot.signal.confidenceLabel && !snapshot.signal.confidenceLabel.startsWith(snapshot.signal.level) ? `${snapshot.signal.level} (${snapshot.signal.confidenceLabel})` : snapshot.signal.level}
               sub={snapshot.signal.why}
             />
             <Figure label="Next action" value={snapshot.action.verdict} sub={snapshot.action.detail} />
@@ -116,7 +116,7 @@ export default function ClientSummarySheet({
             <div style={{ marginTop: 6 }}>
               <OverTimeChart
                 periods={periods} xKey={xKey} yKey={yKey} unit={unit}
-                height={210} width={SUMMARY_WIDTH - 72} compact
+                height={230} width={SUMMARY_WIDTH - 72} compact axisTitles
               />
             </div>
           </div>
@@ -135,10 +135,7 @@ export default function ClientSummarySheet({
                 <span style={{ color: 'var(--text-muted)' }}>Adjusted for: </span>
                 <strong>{m.controls?.length ? m.controls.join(', ') : 'nothing'}</strong>
               </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>Not adjusted for: </span>
-                <strong>{m.controlsUnavailable?.length ? m.controlsUnavailable.join('; ') : 'nothing outstanding'}</strong>
-              </div>
+              <NotAdjusted items={m.controlsUnavailable} />
               {result?.historicalContribution && (
                 <div>
                   <span style={{ color: 'var(--text-muted)' }}>Modelled contribution in this window: </span>
@@ -222,6 +219,25 @@ export default function ClientSummarySheet({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// "(no column in the sheet)" repeated seven times is a wall of text; say it once.
+function NotAdjusted({ items }) {
+  const missing = []; const other = [];
+  (items || []).forEach((t) => {
+    const m = /^(.*?)\s*\(no column in the sheet\)$/.exec(t);
+    if (m) missing.push(m[1]); else other.push(t);
+  });
+  return (
+    <div style={{ marginTop: 2 }}>
+      <span style={{ color: 'var(--text-muted)' }}>Not adjusted for:</span>
+      {!missing.length && !other.length && <strong> nothing outstanding</strong>}
+      <ul style={{ margin: '2px 0 0', paddingLeft: 18 }}>
+        {missing.length > 0 && <li><strong>{missing.join(', ')}</strong> <span style={{ color: 'var(--text-muted)' }}>(no column in the sheet)</span></li>}
+        {other.map((t) => <li key={t}><strong>{t}</strong></li>)}
+      </ul>
     </div>
   );
 }

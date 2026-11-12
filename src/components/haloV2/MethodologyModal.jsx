@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { fmtValue } from '../../lib/haloFields';
+import { fmtValue, signedMoney } from '../../lib/haloFields';
 import { plainMetricLabel } from '../../lib/haloV2/plainLanguage.js';
 import { GRAIN_LABEL } from '../../lib/haloV2/grainRecommendation.js';
 import { NOT_CLAIM_LINE } from '../../lib/haloV2/snapshot.js';
@@ -54,7 +54,7 @@ export default function MethodologyModal({
   const m = result?.adjustedModel || {};
   const contrib = result?.historicalContribution || null;
   const rangeText = range?.start && range?.end ? `${range.start} to ${range.end}` : 'all available';
-  const money = (v) => (v == null ? 'not available' : `${cur}${Number(v).toFixed(2)}`);
+  const money = (v) => (v == null ? 'not available' : signedMoney(cur, v, Number(v).toFixed(2)));
   const interval = (lo, hi) => (lo == null || hi == null ? 'not available' : `${money(lo)} to ${money(hi)}`);
 
   const lines = [

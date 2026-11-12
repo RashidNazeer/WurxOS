@@ -21,6 +21,7 @@
 // ============================================================
 
 import { confidenceRank } from './confidence.js';
+import { signedMoney } from '../haloFields.js';
 
 // The claim ceiling, in one line. Repeated verbatim in the one-pager and the
 // CSV so the caveat travels with every copy of the figure.
@@ -39,7 +40,9 @@ export const SIGNAL_BY_CONFIDENCE = {
 
 export const NEXT_ACTIONS = { scale: 'Scale', hold: 'Hold', more: 'Need more data' };
 
-const money = (cur, v) => `${cur}${Number(v).toFixed(2)}`;
+// "a, b and c", never "a and b and c".
+const humanList = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+const money = (cur, v) => signedMoney(cur, v, Number(v).toFixed(2));
 
 /**
  * Everything the Snapshot renders.
@@ -139,7 +142,7 @@ function buildSignal(m, { unit, spansZero }) {
 // not carry a budget) or Need more data (we do not have a reading).
 function buildAction({ m, el, signal, spansZero, negative, missingMajor, unit }) {
   const caveat = missingMajor.length
-    ? ` ${missingMajor.map((c) => c.label).join(' and ')} ${missingMajor.length === 1 ? 'is' : 'are'} not in the model, so read the size as a ceiling.`
+    ? ` ${humanList(missingMajor.map((c) => c.label))} ${missingMajor.length === 1 ? 'is' : 'are'} not in the model, so read the size as a ceiling.`
     : '';
 
   if (!m.available) {

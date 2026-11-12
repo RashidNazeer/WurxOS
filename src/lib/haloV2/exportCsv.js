@@ -15,7 +15,7 @@
 // it cannot be cropped off the way a header note can.
 // ============================================================
 
-import { fmtValue } from '../haloFields.js';
+import { fmtValue, signedMoney } from '../haloFields.js';
 import { plainMetricLabel } from './plainLanguage.js';
 import { NOT_CLAIM_LINE } from './snapshot.js';
 
@@ -47,7 +47,7 @@ export function buildHaloV2Csv({
   const generatedAt = new Date().toISOString();
   const lines = [];
 
-  const money = (v) => (v == null ? '' : `${currency}${Number(v).toFixed(4)}`);
+  const money = (v) => (v == null ? '' : signedMoney(currency, v, Number(v).toFixed(4)));
   const pct = (v) => (v == null ? '' : `${(Number(v) * 100).toFixed(1)}%`);
   const metricPair = `${plainMetricLabel(xKey)} against ${plainMetricLabel(yKey)}`;
 

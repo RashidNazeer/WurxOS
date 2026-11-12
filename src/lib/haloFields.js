@@ -181,10 +181,13 @@ export { norm as normHeader };
 
 // Format a numeric value for display given a field's fmt (money uses the
 // dataset's detected currency symbol).
+// The minus sign goes before the currency symbol: -$1.36, never $-1.36.
+export const signedMoney = (sym, v, text) => (Number(v) < 0 && Number(text) !== 0 ? `-${sym}${text.replace(/^-/, '')}` : `${sym}${text}`);
+
 export function fmtValue(v, fmt) {
   if (v == null || Number.isNaN(v)) return '—';
   if (fmt === 'money') {
-    return _currency + Number(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    return signedMoney(_currency, v, Number(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
   }
   if (fmt === 'int') return Math.round(Number(v)).toLocaleString();
   return Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
