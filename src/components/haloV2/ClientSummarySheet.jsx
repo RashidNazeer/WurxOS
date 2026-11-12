@@ -116,7 +116,7 @@ export default function ClientSummarySheet({
             <div style={{ marginTop: 6 }}>
               <OverTimeChart
                 periods={periods} xKey={xKey} yKey={yKey} unit={unit}
-                height={210} width={SUMMARY_WIDTH - 72} compact
+                height={230} width={SUMMARY_WIDTH - 72} compact axisTitles
               />
             </div>
           </div>

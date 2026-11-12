@@ -191,7 +191,7 @@ function ReadinessRow({ unit, assessment }) {
 // `width` is normally responsive. The one-pager passes an explicit pixel width
 // because it renders off-screen for the raster export, where a container that
 // measures itself as zero would capture an empty box.
-export function OverTimeChart({ periods, xKey, yKey, unit, normalize = false, height = 280, compact = false, width = '100%' }) {
+export function OverTimeChart({ periods, xKey, yKey, unit, normalize = false, height = 280, compact = false, width = '100%', axisTitles = false }) {
   const withData = periods.filter((p) => p.x != null || p.y != null);
   const xs = withData.map((p) => p.x);
   const ys = withData.map((p) => p.y);
@@ -214,17 +214,17 @@ export function OverTimeChart({ periods, xKey, yKey, unit, normalize = false, he
           <CartesianGrid stroke={GRID} vertical={false} />
           <XAxis
             dataKey="label" tick={{ fontSize: 10 }} minTickGap={20}
-            label={compact ? undefined : { value: `Period (${unit})`, position: 'insideBottom', offset: -16, style: { fontSize: 10.5, fill: 'var(--text-muted)' } }}
+            label={compact && !axisTitles ? undefined : { value: `Period (${unit})`, position: 'insideBottom', offset: -16, style: { fontSize: 10.5, fill: 'var(--text-muted)' } }}
           />
           <YAxis
-            yAxisId="l" tick={{ fontSize: 10 }} width={compact ? 44 : 60}
+            yAxisId="l" tick={{ fontSize: 10 }} width={compact && !axisTitles ? 44 : 60}
             tickFormatter={(v) => formatMetricValue(v, xKey, { indexed: normalize })}
-            label={compact ? undefined : { value: `${xName}${axisSuffix}`, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }}
+            label={compact && !axisTitles ? undefined : { value: `${xName}${axisSuffix}`, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }}
           />
           <YAxis
-            yAxisId="r" orientation="right" tick={{ fontSize: 10 }} width={compact ? 44 : 60}
+            yAxisId="r" orientation="right" tick={{ fontSize: 10 }} width={compact && !axisTitles ? 44 : 60}
             tickFormatter={(v) => formatMetricValue(v, yKey, { indexed: normalize })}
-            label={compact ? undefined : { value: `${yName}${axisSuffix}`, angle: 90, position: 'insideRight', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }}
+            label={compact && !axisTitles ? undefined : { value: `${yName}${axisSuffix}`, angle: 90, position: 'insideRight', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }}
           />
           <Tooltip
             contentStyle={TT_STYLE}
